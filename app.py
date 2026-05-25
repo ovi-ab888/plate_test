@@ -1643,7 +1643,83 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
 
     return merged
 
+# ================================================================
+# V17 - AI Evolution Engine
+# ================================================================
+def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 200):
+    population = []
 
+    for _ in range(20):
+        candidate = random.choice([
+            v3_optimizer, v5_optimizer, v9_optimizer,
+            v11_optimizer, v13_optimizer, v15_optimizer, v16_optimizer
+        ])(demand, capacity, max_plates)
+        population.append(candidate)
+
+    best_solution = None
+    best_waste = 999999
+
+    for generation in range(generations):
+        scored = []
+
+        for sol in population:
+            waste = calculate_waste_percent(sol, demand)
+            scored.append((waste, sol))
+
+            if waste < best_waste:
+                best_waste = waste
+                best_solution = copy.deepcopy(sol)
+
+        scored.sort(key=lambda x: x[0])
+        elites = [copy.deepcopy(x[1]) for x in scored[:5]]
+        new_population = elites.copy()
+
+        while len(new_population) < 20:
+            parent = copy.deepcopy(random.choice(elites))
+
+            for plate in parent:
+                tags = list(plate["layout"].keys())
+
+                if len(tags) >= 2:
+                    a, b = random.sample(tags, 2)
+
+                    if plate["layout"][a] > 1:
+                        plate["layout"][a] -= 1
+                        plate["layout"][b] += 1
+
+                        if sum(plate["layout"].values()) > capacity:
+                            plate["layout"][a] += 1
+                            plate["layout"][b] -= 1
+
+            new_population.append(parent)
+
+        population = new_population
+
+    return best_solution
+
+
+# ================================================================
+# V18 - Global Multi-Plate Optimizer
+# ================================================================
+def v18_optimizer(demand: dict, capacity: int, max_plates: int):
+    candidates = []
+
+    algos = [v14_optimizer, v15_optimizer, v16_optimizer, v17_optimizer, v13_optimizer, v11_optimizer, v9_optimizer]
+
+    for algo in algos:
+        try:
+            result = algo(demand, capacity, max_plates)
+            if result:
+                waste = calculate_waste_percent(result, demand)
+                candidates.append((waste, result))
+        except:
+            pass
+
+    if not candidates:
+        return v13_optimizer(demand, capacity, max_plates)
+
+    candidates.sort(key=lambda x: x[0])
+    return candidates[0][1]
 
 
 
