@@ -1973,7 +1973,7 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
 
 
 # ================================================================
-# V22 - Q-LEARNING OPTIMIZER
+# V22 - Q-LEARNING OPTIMIZER (CORRECTED - NO NEGATIVE EXCESS)
 # ================================================================
 class QLearningPlateOptimizer:
     def __init__(self, demand, capacity, max_plates, learning_rate=0.1, discount=0.9, epsilon=0.1):
@@ -2000,6 +2000,27 @@ class QLearningPlateOptimizer:
         best_actions = [a for a, q in zip(possible_actions, q_values) if q == max_q]
         return random.choice(best_actions) if best_actions else random.choice(possible_actions)
     
+    def ensure_sufficient_production(self, plates, remaining):
+        """Ensure all demand is met by adjusting last plate"""
+        if not plates:
+            return plates
+        
+        # Check if all demand is met
+        for tag in self.tags:
+            total_produced = 0
+            for plate in plates:
+                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+            
+            if total_produced < self.demand.get(tag, 0):
+                # Shortfall exists, add to last plate
+                last_plate = plates[-1]
+                shortfall = self.demand.get(tag, 0) - total_produced
+                ups = last_plate["layout"].get(tag, 1)
+                additional_sheets = ceil(shortfall / ups)
+                last_plate["sheets"] += additional_sheets
+        
+        return plates
+    
     def optimize(self, episodes=30):
         best_plates = None
         best_waste = float('inf')
@@ -2018,6 +2039,7 @@ class QLearningPlateOptimizer:
                 for tag, qty in active.items():
                     layout[tag] = max(1, int((qty / total) * self.capacity))
                 
+                # Adjust to capacity
                 while sum(layout.values()) > self.capacity:
                     max_tag = max(layout, key=layout.get)
                     if layout[max_tag] > 1:
@@ -2029,38 +2051,102 @@ class QLearningPlateOptimizer:
                     max_tag = max(active, key=active.get)
                     layout[max_tag] = layout.get(max_tag, 0) + 1
                 
+                # Calculate sheets needed to meet remaining demand
+                sheets_list = []
+                for tag, ups in layout.items():
+                    if ups > 0 and remaining.get(tag, 0) > 0:
+                        sheets_list.append(ceil(remaining[tag] / ups))
+                
+                if sheets_list:
+                    sheets = max(1, min(sheets_list))
+                else:
+                    sheets = 1
+                
+                # Q-learning improvement
                 state = self.get_state_key(remaining, layout)
                 possible_actions = self.get_possible_actions(layout)
                 
-                if possible_actions:
+                if possible_actions and len(plates) < self.max_plates - 1:  # Don't mutate last plate
                     action = self.get_action(state, possible_actions)
                     new_layout = self.apply_action(layout, action)
                     
-                    sheets = max(1, min(ceil(remaining[t] / new_layout.get(t, 1)) for t in active))
-                    waste = sum(max(0, new_layout.get(t, 0) * sheets - remaining.get(t, 0)) for t in active)
+                    # Ensure capacity
+                    while sum(new_layout.values()) > self.capacity:
+                        max_tag = max(new_layout, key=new_layout.get)
+                        if new_layout[max_tag] > 1:
+                            new_layout[max_tag] -= 1
+                        else:
+                            break
+                    
+                    while sum(new_layout.values()) < self.capacity:
+                        max_tag = max(active, key=active.get)
+                        new_layout[max_tag] = new_layout.get(max_tag, 0) + 1
+                    
+                    # Calculate reward (lower waste is better)
+                    new_sheets = max(1, min(ceil(remaining[t] / new_layout.get(t, 1)) for t in active))
+                    waste = sum(max(0, new_layout.get(t, 0) * new_sheets - remaining.get(t, 0)) for t in active)
                     reward = -waste
                     
                     next_state = self.get_state_key(remaining, new_layout)
                     old_q = self.q_table.get((state, action), 0)
-                    next_max_q = max([self.q_table.get((next_state, a), 0) for a in self.get_possible_actions(new_layout)]) if self.get_possible_actions(new_layout) else 0
+                    next_actions = self.get_possible_actions(new_layout)
+                    next_max_q = max([self.q_table.get((next_state, a), 0) for a in next_actions]) if next_actions else 0
                     new_q = old_q + self.lr * (reward + self.discount * next_max_q - old_q)
                     self.q_table[(state, action)] = new_q
+                    
                     layout = new_layout
+                    sheets = new_sheets
                 
-                sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active))
-                plates.append({"name": plate_name(len(plates) + 1), "layout": layout, "sheets": sheets})
-                
+                # Apply production
                 for tag, ups in layout.items():
                     remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+                
+                plates.append({
+                    "name": plate_name(len(plates) + 1),
+                    "layout": layout,
+                    "sheets": sheets
+                })
+                
+                # Early exit if all demand met
+                if all(v <= 0 for v in remaining.values()):
+                    break
             
+            # FINAL CHECK: Ensure all demand is met (no negative excess)
+            for tag in self.tags:
+                total_produced = 0
+                for plate in plates:
+                    total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+                
+                if total_produced < self.demand.get(tag, 0):
+                    # Add shortfall to last plate
+                    shortfall = self.demand.get(tag, 0) - total_produced
+                    if plates:
+                        last_plate = plates[-1]
+                        ups = last_plate["layout"].get(tag, 1)
+                        additional_sheets = ceil(shortfall / ups)
+                        last_plate["sheets"] += additional_sheets
+            
+            # Recalculate waste after fix
             waste = calculate_waste_percent(plates, self.demand)
+            
             if waste < best_waste:
                 best_waste = waste
                 best_plates = copy.deepcopy(plates)
             
             self.epsilon *= 0.99
         
-        return best_plates
+        # Final validation: ensure no negative excess
+        if best_plates:
+            for tag in self.tags:
+                total_produced = 0
+                for plate in best_plates:
+                    total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+                
+                if total_produced < self.demand.get(tag, 0):
+                    # Fallback to V3 if Q-Learning fails
+                    return v3_optimizer(self.demand, self.capacity, self.max_plates)
+        
+        return best_plates if best_plates else v18_optimizer(self.demand, self.capacity, self.max_plates)
     
     def get_possible_actions(self, layout):
         actions = []
@@ -2084,8 +2170,19 @@ class QLearningPlateOptimizer:
 def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 30) -> list:
     optimizer = QLearningPlateOptimizer(demand, capacity, max_plates)
     result = optimizer.optimize(episodes)
-    return result if result else v18_optimizer(demand, capacity, max_plates)
-
+    
+    # Final safety check
+    if result:
+        for tag in demand:
+            total_produced = 0
+            for plate in result:
+                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+            
+            if total_produced < demand.get(tag, 0):
+                # Fallback to V3
+                return v3_optimizer(demand, capacity, max_plates)
+    
+    return result if result else v3_optimizer(demand, capacity, max_plates)
 
 
 
