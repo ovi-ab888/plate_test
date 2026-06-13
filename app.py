@@ -1874,7 +1874,7 @@ def v20_optimizer(demand: dict, capacity: int, max_plates: int,
 
 
 # ================================================================
-# V21 - ANT COLONY OPTIMIZATION (ACO)
+# V21 - ANT COLONY OPTIMIZATION (ACO) - CORRECTED
 # ================================================================
 def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                    ants: int = 15, iterations: int = 30,
@@ -1884,6 +1884,10 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
     tags = list(demand.keys())
     n_tags = len(tags)
     
+    if n_tags == 0:
+        return []
+    
+    # Initialize pheromone
     pheromone = {}
     for i in range(n_tags):
         for j in range(1, capacity + 1):
@@ -1896,7 +1900,7 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
         remaining = demand.copy()
         plates = []
         
-        for _ in range(max_plates):
+        for plate_idx in range(max_plates):
             active = {k: v for k, v in remaining.items() if v > 0}
             if not active:
                 break
@@ -1904,52 +1908,127 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
             layout = {}
             remaining_cap = capacity
             
-            for tag in active.keys():
+            # Randomly order tags for diversity
+            active_tags = list(active.keys())
+            random.shuffle(active_tags)
+            
+            # Build layout using pheromone and heuristic
+            for tag in active_tags:
                 if remaining_cap <= 0:
                     break
                 
                 tag_idx = tags.index(tag)
+                max_allowed_ups = min(remaining_cap, active[tag])
+                
+                if max_allowed_ups <= 0:
+                    continue
+                
+                possible_ups = list(range(1, max_allowed_ups + 1))
                 probabilities = []
-                possible_ups = list(range(1, min(remaining_cap, active[tag]) + 1))
                 
                 for ups in possible_ups:
-                    prob = (pheromone.get((tag_idx, ups), 1.0) ** alpha) * ((1.0 / ups) ** beta)
-                    probabilities.append(prob)
+                    # Pheromone trail
+                    tau = pheromone.get((tag_idx, ups), 1.0) ** alpha
+                    # Heuristic: prefer higher UPS to meet demand faster
+                    eta = (1.0 / ups) ** beta
+                    probabilities.append(tau * eta)
                 
-                if probabilities:
+                if probabilities and sum(probabilities) > 0:
                     total_prob = sum(probabilities)
-                    if total_prob > 0:
-                        probs = [p / total_prob for p in probabilities]
-                        chosen_ups = random.choices(possible_ups, weights=probs)[0]
+                    probs = [p / total_prob for p in probabilities]
+                    chosen_ups = random.choices(possible_ups, weights=probs)[0]
+                else:
+                    chosen_ups = max(1, min(max_allowed_ups, capacity // len(active_tags) + 1))
+                
+                layout[tag] = chosen_ups
+                remaining_cap -= chosen_ups
+            
+            # Fill remaining capacity
+            if remaining_cap > 0 and active:
+                # Distribute remaining capacity proportionally
+                remaining_tags = list(active.keys())
+                while remaining_cap > 0 and remaining_tags:
+                    for tag in remaining_tags:
+                        if remaining_cap <= 0:
+                            break
+                        layout[tag] = layout.get(tag, 0) + 1
+                        remaining_cap -= 1
+            
+            # Ensure layout is valid
+            if not layout:
+                # Fallback: simple proportional layout
+                total_active = sum(active.values())
+                for tag, qty in active.items():
+                    layout[tag] = max(1, int((qty / total_active) * capacity))
+                
+                # Adjust to exact capacity
+                while sum(layout.values()) > capacity:
+                    max_tag = max(layout, key=layout.get)
+                    if layout[max_tag] > 1:
+                        layout[max_tag] -= 1
                     else:
-                        chosen_ups = min(possible_ups)
-                    
-                    layout[tag] = chosen_ups
-                    remaining_cap -= chosen_ups
+                        break
+                
+                while sum(layout.values()) < capacity:
+                    max_tag = max(active, key=active.get)
+                    layout[max_tag] = layout.get(max_tag, 0) + 1
             
-            while remaining_cap > 0:
-                max_tag = max(active, key=active.get)
-                layout[max_tag] = layout.get(max_tag, 0) + 1
-                remaining_cap -= 1
+            # Calculate sheets needed
+            sheets_list = []
+            for tag, ups in layout.items():
+                if ups > 0 and remaining.get(tag, 0) > 0:
+                    sheets_list.append(ceil(remaining[tag] / ups))
             
-            sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
-            plates.append({"layout": layout, "sheets": sheets})
+            if sheets_list:
+                sheets = max(1, min(sheets_list))
+            else:
+                sheets = 1
             
+            # Apply production
             for tag, ups in layout.items():
                 remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+            
+            plates.append({
+                "name": plate_name(len(plates) + 1),  # IMPORTANT: Add name
+                "layout": layout,
+                "sheets": sheets
+            })
+            
+            # Early exit if all demand met
+            if all(v <= 0 for v in remaining.values()):
+                break
+        
+        # FINAL CHECK: Ensure all demand is met (no shortfall)
+        for tag in demand.keys():
+            total_produced = 0
+            for plate in plates:
+                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+            
+            if total_produced < demand.get(tag, 0):
+                # Add shortfall to last plate
+                shortfall = demand.get(tag, 0) - total_produced
+                if plates:
+                    last_plate = plates[-1]
+                    ups = last_plate["layout"].get(tag, 1)
+                    additional_sheets = ceil(shortfall / max(1, ups))
+                    last_plate["sheets"] += additional_sheets
         
         return plates
     
     def update_pheromone(plates, waste):
-        for key in pheromone:
+        # Evaporation
+        for key in list(pheromone.keys()):
             pheromone[key] *= (1 - evaporation)
         
-        deposit = 1.0 / (waste + 1)
+        # Deposit pheromone (better solutions get more)
+        deposit = 10.0 / (waste + 1) if waste > 0 else 100.0
+        
         for plate in plates:
             for tag, ups in plate["layout"].items():
                 tag_idx = tags.index(tag)
-                pheromone[(tag_idx, ups)] += deposit
+                pheromone[(tag_idx, ups)] = pheromone.get((tag_idx, ups), 1.0) + deposit
     
+    # Main ACO loop
     for iteration in range(iterations):
         iteration_best_plates = None
         iteration_best_waste = float('inf')
@@ -1960,7 +2039,7 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
             
             if waste < iteration_best_waste:
                 iteration_best_waste = waste
-                iteration_best_plates = plates
+                iteration_best_plates = copy.deepcopy(plates)
             
             if waste < best_waste:
                 best_waste = waste
@@ -1968,8 +2047,29 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
         
         if iteration_best_plates:
             update_pheromone(iteration_best_plates, iteration_best_waste)
+        
+        # Early stop if perfect solution found
+        if best_waste == 0:
+            break
     
-    return best_plates if best_plates else v18_optimizer(demand, capacity, max_plates)
+    # Final validation and fallback
+    if best_plates:
+        # Ensure all plates have names
+        for idx, plate in enumerate(best_plates):
+            if "name" not in plate:
+                plate["name"] = plate_name(idx + 1)
+        
+        # Final demand check
+        for tag in demand:
+            total_produced = 0
+            for plate in best_plates:
+                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+            
+            if total_produced < demand.get(tag, 0):
+                # Fallback to V3
+                return v3_optimizer(demand, capacity, max_plates)
+    
+    return best_plates if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
