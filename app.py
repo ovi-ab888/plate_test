@@ -1,5 +1,5 @@
-# app2.py — ADVANCED APP (V19 to V26) + All Algorithms
-# Experimental & Heavy Algorithms for Research
+# app.py — COMPLETE PLATE RATIO SYSTEM (V1 to V26)
+# All Algorithms Fixed | No Negative Excess | Production Ready
 # Design by Ovi
 
 import os
@@ -21,7 +21,7 @@ import pandas as pd
 # LIBRARY IMPORTS & CHECKS
 # ================================================================
 
-# Try to import PuLP
+# Try to import PuLP for Integer Solver
 try:
     from pulp import LpProblem, LpMinimize, LpVariable, lpSum, value, LpInteger
     PULP_AVAILABLE = True
@@ -51,15 +51,145 @@ except ImportError:
 # STREAMLIT PAGE CONFIGURATION
 # ================================================================
 st.set_page_config(
-    page_title="Advanced Plate Ratio System - V19 to V26",
-    page_icon="🔬",
+    page_title="Plate Ratio System - Complete Edition",
+    page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 
+# ================================================================
+# PASSWORD AUTHENTICATION
+# ================================================================
+def check_password():
+    expected = None
+    try:
+        expected = st.secrets.get("app_password", None)
+    except Exception:
+        pass
+    
+    if expected is None:
+        expected = os.environ.get("PEPCO_APP_PASSWORD")
+    
+    if expected is None:
+        st.error("App password not configured.")
+        return False
+
+    def _password_entered():
+        if st.session_state.get("password") == expected:
+            st.session_state["password_correct"] = True
+            try:
+                del st.session_state["password"]
+            except Exception:
+                pass
+        else:
+            st.session_state["password_correct"] = False
+            st.session_state["wrong_password"] = True
+
+    if st.session_state.get("password_correct", None) is True:
+        return True
+
+    # Password Page Styling
+    st.markdown("""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; }
+        .stApp {
+            background: linear-gradient(-45deg, #0f0c29, #1a1a3e, #24243e, #1a1a3e);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+        }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .main > div { background: transparent !important; padding: 0 !important; }
+        .block-container { padding: 0rem !important; max-width: 90% !important; }
+        .main-header {
+            background: linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 30px;
+            margin: 1rem 1rem 0rem 1rem;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .main-header h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 0;
+        }
+        .password-container {
+            max-width: 460px;
+            margin: 40px auto 8px auto;
+            padding: 2.8rem 2rem 1.8rem 2rem;
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
+        }
+        .lock-icon { font-size: 3rem; margin: 1rem 0; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .stTextInput { margin-top: -10px !important; }
+        .stTextInput input {
+            background: rgba(255,255,255,0.08) !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            border-radius: 30px !important;
+            color: white !important;
+            text-align: center !important;
+            font-size: 1.1rem !important;
+            padding: 0.9rem 1.5rem !important;
+            letter-spacing: 3px;
+        }
+        #MainMenu, header, footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="main-header">
+        <h1>Plate Ratio System</h1>
+        <p>Intelligent Production Planning & Ratio Optimization</p>
+        <p style="font-size: 0.85rem; opacity: 0.8;">AI-Powered • Fast • Accurate</p>
+        <p class="designer-name">✨ Design by Ovi ✨</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="password-container">
+        <h2>Welcome Back</h2>
+        <div class="lock-icon">🔐</div>
+        <p>Enter your secure access code to continue</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1.4, 1.1, 1.4])
+    with col2:
+        st.text_input(
+            label="",
+            type="password",
+            key="password",
+            on_change=_password_entered,
+            label_visibility="collapsed",
+            placeholder="••••••••"
+        )
+
+    if st.session_state.get("password_correct") is False:
+        st.error("❌ Incorrect password. Please contact Mr. Ovi.")
+
+    return False
 
 
+# ================== APP START ==================
+if not check_password():
+    st.stop()
+
+st.success("✅ Successfully logged in!")
 
 
 # ================================================================
@@ -68,13 +198,8 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    
     * { font-family: 'Inter', sans-serif; }
-    
-    .stApp {
-        background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #24243e 100%);
-    }
-    
+    .stApp { background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #24243e 100%); }
     .main-header {
         background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
         backdrop-filter: blur(10px);
@@ -84,7 +209,6 @@ st.markdown("""
         text-align: center;
         border-radius: 0;
     }
-    
     .main-header h1 {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
@@ -93,9 +217,7 @@ st.markdown("""
         font-weight: 700;
         margin: 0;
     }
-    
     .main-header p { color: rgba(255,255,255,0.7); margin-top: 0.5rem; }
-    
     .card {
         background: rgba(255,255,255,0.05);
         backdrop-filter: blur(10px);
@@ -105,12 +227,7 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.1);
         transition: all 0.3s ease;
     }
-    
-    .card:hover {
-        border-color: rgba(102,126,234,0.5);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    }
-    
+    .card:hover { border-color: rgba(102,126,234,0.5); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
     .card-title {
         font-size: 1.2rem;
         font-weight: 600;
@@ -122,7 +239,15 @@ st.markdown("""
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
     }
-    
+    .metric-card {
+        background: linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 1rem;
+        color: white;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
     .metric-value {
         font-size: 2rem;
         font-weight: 700;
@@ -130,22 +255,18 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
-    
     .metric-label { font-size: 0.85rem; color: rgba(255,255,255,0.7); margin-top: 0.5rem; }
-    
     .best-algo {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
         border-radius: 20px;
         padding: 1.5rem;
         color: white;
         text-align: center;
         border: none;
-        box-shadow: 0 10px 30px rgba(102,126,234,0.3);
+        box-shadow: 0 10px 30px rgba(0,176,155,0.3);
         margin-bottom: 2rem;
     }
-    
     .best-algo .metric-value { -webkit-text-fill-color: white; font-size: 1.5rem; }
-    
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -157,12 +278,7 @@ st.markdown("""
         transition: all 0.3s ease;
         font-size: 1rem;
     }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(102,126,234,0.4);
-    }
-    
+    .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102,126,234,0.4); }
     .stNumberInput input, .stTextInput input {
         background: rgba(255,255,255,0.08) !important;
         border: 1px solid rgba(255,255,255,0.1) !important;
@@ -170,7 +286,12 @@ st.markdown("""
         color: white !important;
         padding: 0.5rem 1rem !important;
     }
-    
+    .stNumberInput input:focus, .stTextInput input:focus {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 2px rgba(102,126,234,0.2) !important;
+        background: rgba(255,255,255,0.12) !important;
+    }
+    .stDataFrame { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 0.5rem; }
     .tag-display {
         background: linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%);
         padding: 10px;
@@ -181,24 +302,8 @@ st.markdown("""
         text-align: center;
         font-size: 0.9rem;
     }
-    
-    .warning {
-        background: rgba(255,193,7,0.1);
-        padding: 12px;
-        border-radius: 12px;
-        border-left: 4px solid #ffc107;
-        color: #ffc107;
-        margin: 1rem 0;
-    }
-    
-    .info {
-        background: rgba(23,162,184,0.1);
-        padding: 12px;
-        border-radius: 12px;
-        border-left: 4px solid #17a2b8;
-        color: #17a2b8;
-    }
-    
+    .warning { background: rgba(255,193,7,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #ffc107; color: #ffc107; margin: 1rem 0; }
+    .info { background: rgba(23,162,184,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #17a2b8; color: #17a2b8; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
     ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; }
@@ -210,7 +315,7 @@ st.markdown("""
 # HELPER FUNCTIONS
 # ================================================================
 def plate_name(n: int) -> str:
-    """Convert number to Excel-style column name"""
+    """Convert number to Excel-style column name (A, B, C, ..., Z, AA, AB, ...)"""
     n -= 1
     chars = string.ascii_uppercase
     out = ""
@@ -248,6 +353,32 @@ def calculate_waste_percent(plates: list, demand: dict) -> float:
         waste_percent = 0.0
     
     return round(waste_percent, 2)
+
+
+def ensure_demand_met(plates: list, demand: dict) -> list:
+    """Ensure all demand is met - no negative excess"""
+    if not plates:
+        return plates
+    
+    for tag in demand.keys():
+        total_produced = 0
+        for plate in plates:
+            total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
+        
+        if total_produced < demand.get(tag, 0):
+            shortfall = demand.get(tag, 0) - total_produced
+            if plates:
+                last_plate = plates[-1]
+                ups = last_plate["layout"].get(tag, 1)
+                additional_sheets = ceil(shortfall / max(1, ups))
+                last_plate["sheets"] += additional_sheets
+    
+    # Ensure all plates have names
+    for idx, plate in enumerate(plates):
+        if "name" not in plate:
+            plate["name"] = plate_name(idx + 1)
+    
+    return plates
 
 
 def build_full_summary(plates: list, demand: dict, original_qty: dict) -> pd.DataFrame:
@@ -341,7 +472,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         )
 
         story = []
-        story.append(Paragraph("🔬 Advanced Plate Ratio System - Research Report", title_style))
+        story.append(Paragraph("📊 Plate Ratio System - Ratio Report", title_style))
         story.append(Paragraph(
             f"Algorithm: {algo_name} | Waste: {waste_percent}% | "
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -423,7 +554,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
             'Footer', parent=styles['Normal'],
             fontSize=8, alignment=TA_CENTER, textColor=colors.grey
         )
-        story.append(Paragraph("This Report Generated by Ovi's Advanced Plate Ratio System", footer_style))
+        story.append(Paragraph("This Report Generated by Ovi's Plate Ratio System", footer_style))
 
         doc.build(story)
         buffer.seek(0)
@@ -498,7 +629,7 @@ def v1_optimizer(demand: dict, cap: int, max_plates: int) -> list:
                 last["sheets"] += add_sheets
                 remaining[k] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -546,7 +677,7 @@ def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 last["sheets"] += add_sheets
                 remaining[tag] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -610,7 +741,7 @@ def v3_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 last["sheets"] += extra_sheets
                 remaining[tag] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -689,7 +820,7 @@ def v4_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
             best_score = waste_percent
             best_plates = plates
 
-    return best_plates
+    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -736,7 +867,7 @@ def generate_layout_v5(active: dict, capacity: int) -> dict:
     return layout
 
 
-def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 100) -> list:
+def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
     best_score = 999999
     best_plates = None
 
@@ -777,7 +908,7 @@ def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
             best_score = waste_percent
             best_plates = copy.deepcopy(plates)
 
-    return best_plates
+    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -828,13 +959,13 @@ def v6_optimizer(demand: dict, capacity: int, max_plates: int) -> list | None:
         except Exception:
             return v3_optimizer(demand, capacity, max_plates)
 
-    return plates if plates else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(plates, demand) if plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
 # V7 - Simulated Annealing
 # ================================================================
-def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 200) -> list:
+def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 150) -> list:
     def calculate_waste(layout: dict, sheets: int, remaining: dict) -> int:
         return sum(max(0, ups * sheets - remaining.get(tag, 0)) for tag, ups in layout.items())
 
@@ -942,7 +1073,7 @@ def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
                 last["sheets"] += ceil(remaining[tag] / ups)
                 remaining[tag] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -973,7 +1104,7 @@ class MCTSNodeV8:
         return max(choices, key=lambda x: x[0])[1]
 
 
-def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 100) -> list:
+def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
     def adjust_to_exact_capacity(layout: dict, capacity: int, remaining: dict) -> dict:
         if not layout or not remaining:
             return layout
@@ -1073,7 +1204,7 @@ def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
                 last["sheets"] += ceil(remaining[tag] / ups)
                 remaining[tag] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -1149,7 +1280,7 @@ def v9_optimizer(demand: dict, capacity: int, max_plates: int, repair_iterations
                 last["sheets"] += ceil(remaining[tag] / ups)
                 remaining[tag] = 0
 
-    return plates
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -1228,14 +1359,14 @@ def v10_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
             best_waste = waste
             best_plates = plates
     
-    return best_plates if best_plates else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
 # V11 - Genetic Algorithm
 # ================================================================
 def v11_optimizer(demand: dict, capacity: int, max_plates: int, 
-                   population_size: int = 50, generations: int = 100, 
+                   population_size: int = 30, generations: int = 50, 
                    mutation_rate: float = 0.1, elite_size: int = 5) -> list:
     
     items = list(demand.keys())
@@ -1366,7 +1497,7 @@ def v11_optimizer(demand: dict, capacity: int, max_plates: int,
         population = new_population
     
     best_idx = max(range(len(population)), key=lambda i: calculate_fitness(population[i]))
-    return population[best_idx]
+    return ensure_demand_met(population[best_idx], demand)
 
 
 # ================================================================
@@ -1527,7 +1658,7 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     elif any(v > 0 for v in remaining.values()):
         return v3_optimizer(demand, capacity, max_plates)
     
-    return plates if plates else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(plates, demand) if plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1556,7 +1687,7 @@ def v13_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 best_waste = waste
                 best_plates = plates
     
-    return best_plates if best_plates else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1603,7 +1734,7 @@ def v15_optimizer(demand: dict, capacity: int, max_plates: int):
             best = copy.deepcopy(trial)
             best_waste = waste
 
-    return best
+    return ensure_demand_met(best, demand)
 
 
 # ================================================================
@@ -1641,7 +1772,8 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
 
         merged.append(current)
 
-    return merged
+    return ensure_demand_met(merged, demand)
+
 
 # ================================================================
 # V17 - AI Evolution Engine
@@ -1695,7 +1827,7 @@ def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int
 
         population = new_population
 
-    return best_solution
+    return ensure_demand_met(best_solution, demand) if best_solution else v13_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1719,11 +1851,7 @@ def v18_optimizer(demand: dict, capacity: int, max_plates: int):
         return v13_optimizer(demand, capacity, max_plates)
 
     candidates.sort(key=lambda x: x[0])
-    return candidates[0][1]
-
-
-
-
+    return ensure_demand_met(candidates[0][1], demand)
 
 
 # ================================================================
@@ -1792,7 +1920,7 @@ def v19_optimizer(demand: dict, capacity: int, max_plates: int, time_limit_secon
                         "layout": layout,
                         "sheets": int(solver.Value(sheets[i]))
                     })
-        return plates if plates else v18_optimizer(demand, capacity, max_plates)
+        return ensure_demand_met(plates, demand) if plates else v18_optimizer(demand, capacity, max_plates)
     
     return v18_optimizer(demand, capacity, max_plates)
 
@@ -1845,7 +1973,7 @@ def v20_optimizer(demand: dict, capacity: int, max_plates: int,
                         ups = max(1, last["layout"].get(tag, 1))
                         last["sheets"] += ceil(remaining[tag] / ups)
                         remaining[tag] = 0
-            self.update_fitness()
+            self.plates = ensure_demand_met(self.plates, demand)
         
         def update_fitness(self):
             return calculate_waste_percent(self.plates, demand)
@@ -1870,7 +1998,7 @@ def v20_optimizer(demand: dict, capacity: int, max_plates: int,
                         layout[a] -= 1
                         layout[b] += 1
     
-    return best_global_plates if best_global_plates else v18_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_global_plates, demand) if best_global_plates else v18_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1887,7 +2015,6 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
     if n_tags == 0:
         return []
     
-    # Initialize pheromone
     pheromone = {}
     for i in range(n_tags):
         for j in range(1, capacity + 1):
@@ -1908,11 +2035,9 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
             layout = {}
             remaining_cap = capacity
             
-            # Randomly order tags for diversity
             active_tags = list(active.keys())
             random.shuffle(active_tags)
             
-            # Build layout using pheromone and heuristic
             for tag in active_tags:
                 if remaining_cap <= 0:
                     break
@@ -1927,9 +2052,7 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                 probabilities = []
                 
                 for ups in possible_ups:
-                    # Pheromone trail
                     tau = pheromone.get((tag_idx, ups), 1.0) ** alpha
-                    # Heuristic: prefer higher UPS to meet demand faster
                     eta = (1.0 / ups) ** beta
                     probabilities.append(tau * eta)
                 
@@ -1943,9 +2066,7 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                 layout[tag] = chosen_ups
                 remaining_cap -= chosen_ups
             
-            # Fill remaining capacity
             if remaining_cap > 0 and active:
-                # Distribute remaining capacity proportionally
                 remaining_tags = list(active.keys())
                 while remaining_cap > 0 and remaining_tags:
                     for tag in remaining_tags:
@@ -1954,14 +2075,11 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                         layout[tag] = layout.get(tag, 0) + 1
                         remaining_cap -= 1
             
-            # Ensure layout is valid
             if not layout:
-                # Fallback: simple proportional layout
                 total_active = sum(active.values())
                 for tag, qty in active.items():
                     layout[tag] = max(1, int((qty / total_active) * capacity))
                 
-                # Adjust to exact capacity
                 while sum(layout.values()) > capacity:
                     max_tag = max(layout, key=layout.get)
                     if layout[max_tag] > 1:
@@ -1973,7 +2091,6 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                     max_tag = max(active, key=active.get)
                     layout[max_tag] = layout.get(max_tag, 0) + 1
             
-            # Calculate sheets needed
             sheets_list = []
             for tag, ups in layout.items():
                 if ups > 0 and remaining.get(tag, 0) > 0:
@@ -1984,43 +2101,24 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
             else:
                 sheets = 1
             
-            # Apply production
             for tag, ups in layout.items():
                 remaining[tag] = max(0, remaining[tag] - (ups * sheets))
             
             plates.append({
-                "name": plate_name(len(plates) + 1),  # IMPORTANT: Add name
+                "name": plate_name(len(plates) + 1),
                 "layout": layout,
                 "sheets": sheets
             })
             
-            # Early exit if all demand met
             if all(v <= 0 for v in remaining.values()):
                 break
         
-        # FINAL CHECK: Ensure all demand is met (no shortfall)
-        for tag in demand.keys():
-            total_produced = 0
-            for plate in plates:
-                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-            
-            if total_produced < demand.get(tag, 0):
-                # Add shortfall to last plate
-                shortfall = demand.get(tag, 0) - total_produced
-                if plates:
-                    last_plate = plates[-1]
-                    ups = last_plate["layout"].get(tag, 1)
-                    additional_sheets = ceil(shortfall / max(1, ups))
-                    last_plate["sheets"] += additional_sheets
-        
-        return plates
+        return ensure_demand_met(plates, demand)
     
     def update_pheromone(plates, waste):
-        # Evaporation
         for key in list(pheromone.keys()):
             pheromone[key] *= (1 - evaporation)
         
-        # Deposit pheromone (better solutions get more)
         deposit = 10.0 / (waste + 1) if waste > 0 else 100.0
         
         for plate in plates:
@@ -2028,7 +2126,6 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                 tag_idx = tags.index(tag)
                 pheromone[(tag_idx, ups)] = pheromone.get((tag_idx, ups), 1.0) + deposit
     
-    # Main ACO loop
     for iteration in range(iterations):
         iteration_best_plates = None
         iteration_best_waste = float('inf')
@@ -2048,32 +2145,14 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
         if iteration_best_plates:
             update_pheromone(iteration_best_plates, iteration_best_waste)
         
-        # Early stop if perfect solution found
         if best_waste == 0:
             break
     
-    # Final validation and fallback
-    if best_plates:
-        # Ensure all plates have names
-        for idx, plate in enumerate(best_plates):
-            if "name" not in plate:
-                plate["name"] = plate_name(idx + 1)
-        
-        # Final demand check
-        for tag in demand:
-            total_produced = 0
-            for plate in best_plates:
-                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-            
-            if total_produced < demand.get(tag, 0):
-                # Fallback to V3
-                return v3_optimizer(demand, capacity, max_plates)
-    
-    return best_plates if best_plates else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_plates, demand) if best_plates else v18_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
-# V22 - Q-LEARNING OPTIMIZER (CORRECTED - NO NEGATIVE EXCESS)
+# V22 - Q-LEARNING OPTIMIZER (CORRECTED)
 # ================================================================
 class QLearningPlateOptimizer:
     def __init__(self, demand, capacity, max_plates, learning_rate=0.1, discount=0.9, epsilon=0.1):
@@ -2100,27 +2179,6 @@ class QLearningPlateOptimizer:
         best_actions = [a for a, q in zip(possible_actions, q_values) if q == max_q]
         return random.choice(best_actions) if best_actions else random.choice(possible_actions)
     
-    def ensure_sufficient_production(self, plates, remaining):
-        """Ensure all demand is met by adjusting last plate"""
-        if not plates:
-            return plates
-        
-        # Check if all demand is met
-        for tag in self.tags:
-            total_produced = 0
-            for plate in plates:
-                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-            
-            if total_produced < self.demand.get(tag, 0):
-                # Shortfall exists, add to last plate
-                last_plate = plates[-1]
-                shortfall = self.demand.get(tag, 0) - total_produced
-                ups = last_plate["layout"].get(tag, 1)
-                additional_sheets = ceil(shortfall / ups)
-                last_plate["sheets"] += additional_sheets
-        
-        return plates
-    
     def optimize(self, episodes=30):
         best_plates = None
         best_waste = float('inf')
@@ -2139,7 +2197,6 @@ class QLearningPlateOptimizer:
                 for tag, qty in active.items():
                     layout[tag] = max(1, int((qty / total) * self.capacity))
                 
-                # Adjust to capacity
                 while sum(layout.values()) > self.capacity:
                     max_tag = max(layout, key=layout.get)
                     if layout[max_tag] > 1:
@@ -2151,26 +2208,13 @@ class QLearningPlateOptimizer:
                     max_tag = max(active, key=active.get)
                     layout[max_tag] = layout.get(max_tag, 0) + 1
                 
-                # Calculate sheets needed to meet remaining demand
-                sheets_list = []
-                for tag, ups in layout.items():
-                    if ups > 0 and remaining.get(tag, 0) > 0:
-                        sheets_list.append(ceil(remaining[tag] / ups))
-                
-                if sheets_list:
-                    sheets = max(1, min(sheets_list))
-                else:
-                    sheets = 1
-                
-                # Q-learning improvement
                 state = self.get_state_key(remaining, layout)
                 possible_actions = self.get_possible_actions(layout)
                 
-                if possible_actions and len(plates) < self.max_plates - 1:  # Don't mutate last plate
+                if possible_actions and len(plates) < self.max_plates - 1:
                     action = self.get_action(state, possible_actions)
                     new_layout = self.apply_action(layout, action)
                     
-                    # Ensure capacity
                     while sum(new_layout.values()) > self.capacity:
                         max_tag = max(new_layout, key=new_layout.get)
                         if new_layout[max_tag] > 1:
@@ -2182,7 +2226,6 @@ class QLearningPlateOptimizer:
                         max_tag = max(active, key=active.get)
                         new_layout[max_tag] = new_layout.get(max_tag, 0) + 1
                     
-                    # Calculate reward (lower waste is better)
                     new_sheets = max(1, min(ceil(remaining[t] / new_layout.get(t, 1)) for t in active))
                     waste = sum(max(0, new_layout.get(t, 0) * new_sheets - remaining.get(t, 0)) for t in active)
                     reward = -waste
@@ -2195,38 +2238,14 @@ class QLearningPlateOptimizer:
                     self.q_table[(state, action)] = new_q
                     
                     layout = new_layout
-                    sheets = new_sheets
-                
-                # Apply production
-                for tag, ups in layout.items():
-                    remaining[tag] = max(0, remaining[tag] - (ups * sheets))
-                
-                plates.append({
-                    "name": plate_name(len(plates) + 1),
-                    "layout": layout,
-                    "sheets": sheets
-                })
-                
-                # Early exit if all demand met
-                if all(v <= 0 for v in remaining.values()):
-                    break
             
-            # FINAL CHECK: Ensure all demand is met (no negative excess)
-            for tag in self.tags:
-                total_produced = 0
-                for plate in plates:
-                    total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-                
-                if total_produced < self.demand.get(tag, 0):
-                    # Add shortfall to last plate
-                    shortfall = self.demand.get(tag, 0) - total_produced
-                    if plates:
-                        last_plate = plates[-1]
-                        ups = last_plate["layout"].get(tag, 1)
-                        additional_sheets = ceil(shortfall / ups)
-                        last_plate["sheets"] += additional_sheets
+            sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active))
+            plates.append({"name": plate_name(len(plates) + 1), "layout": layout, "sheets": sheets})
             
-            # Recalculate waste after fix
+            for tag, ups in layout.items():
+                remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+            
+            plates = ensure_demand_met(plates, self.demand)
             waste = calculate_waste_percent(plates, self.demand)
             
             if waste < best_waste:
@@ -2235,18 +2254,7 @@ class QLearningPlateOptimizer:
             
             self.epsilon *= 0.99
         
-        # Final validation: ensure no negative excess
-        if best_plates:
-            for tag in self.tags:
-                total_produced = 0
-                for plate in best_plates:
-                    total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-                
-                if total_produced < self.demand.get(tag, 0):
-                    # Fallback to V3 if Q-Learning fails
-                    return v3_optimizer(self.demand, self.capacity, self.max_plates)
-        
-        return best_plates if best_plates else v18_optimizer(self.demand, self.capacity, self.max_plates)
+        return ensure_demand_met(best_plates, self.demand) if best_plates else v3_optimizer(self.demand, self.capacity, self.max_plates)
     
     def get_possible_actions(self, layout):
         actions = []
@@ -2270,20 +2278,93 @@ class QLearningPlateOptimizer:
 def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 30) -> list:
     optimizer = QLearningPlateOptimizer(demand, capacity, max_plates)
     result = optimizer.optimize(episodes)
-    
-    # Final safety check
-    if result:
-        for tag in demand:
-            total_produced = 0
-            for plate in result:
-                total_produced += plate["layout"].get(tag, 0) * plate["sheets"]
-            
-            if total_produced < demand.get(tag, 0):
-                # Fallback to V3
-                return v3_optimizer(demand, capacity, max_plates)
-    
-    return result if result else v3_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(result, demand) if result else v3_optimizer(demand, capacity, max_plates)
 
+
+# ================================================================
+# V23 - BRANCH AND BOUND OPTIMIZER
+# ================================================================
+def v23_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    tags = list(demand.keys())
+    n_tags = len(tags)
+    
+    if n_tags > 8:
+        return v18_optimizer(demand, capacity, max_plates)
+    
+    best_plates = None
+    best_waste = float('inf')
+    
+    def backtrack(remaining, current_plates, plate_num):
+        nonlocal best_plates, best_waste
+        
+        current_waste = calculate_waste_percent(current_plates, demand) if current_plates else 0
+        if current_waste >= best_waste:
+            return
+        
+        if all(v <= 0 for v in remaining.values()):
+            if current_waste < best_waste:
+                best_waste = current_waste
+                best_plates = copy.deepcopy(current_plates)
+            return
+        
+        if plate_num >= max_plates:
+            if current_plates:
+                last_plate = current_plates[-1]
+                for tag in remaining:
+                    if remaining[tag] > 0:
+                        ups = max(1, last_plate["layout"].get(tag, 1))
+                        last_plate["sheets"] += ceil(remaining[tag] / ups)
+                        remaining[tag] = 0
+                
+                final_waste = calculate_waste_percent(current_plates, demand)
+                if final_waste < best_waste:
+                    best_waste = final_waste
+                    best_plates = copy.deepcopy(current_plates)
+            return
+        
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            return
+        
+        def generate_layouts(current_layout, remaining_cap, start_idx):
+            if remaining_cap == 0 or start_idx >= len(active_tags):
+                yield current_layout.copy()
+                return
+            
+            tag = active_tags[start_idx]
+            max_ups = min(remaining_cap, active[tag])
+            
+            for ups in range(1, max_ups + 1):
+                current_layout[tag] = ups
+                yield from generate_layouts(current_layout, remaining_cap - ups, start_idx + 1)
+            
+            if tag in current_layout:
+                del current_layout[tag]
+            yield from generate_layouts(current_layout, remaining_cap, start_idx + 1)
+        
+        active_tags = list(active.keys())
+        
+        for layout in generate_layouts({}, capacity, 0):
+            if not layout or sum(layout.values()) != capacity:
+                continue
+            
+            sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active_tags if layout.get(t, 0) > 0))
+            
+            new_remaining = remaining.copy()
+            for tag, ups in layout.items():
+                new_remaining[tag] = max(0, new_remaining[tag] - (ups * sheets))
+            
+            new_plates = current_plates.copy()
+            new_plates.append({
+                "name": plate_name(plate_num + 1),
+                "layout": layout,
+                "sheets": sheets
+            })
+            
+            backtrack(new_remaining, new_plates, plate_num + 1)
+    
+    backtrack(demand.copy(), [], 0)
+    return ensure_demand_met(best_plates, demand) if best_plates else v18_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -2297,19 +2378,16 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
     n_tags = len(tags)
     
     def encode_plates_to_vector(plates):
-        """Convert plates to continuous vector"""
         vector = []
         for plate in plates:
             for tag in tags:
                 vector.append(plate["layout"].get(tag, 0) / capacity)
             vector.append(plate["sheets"] / 1000.0)
-        # Pad to fixed length
         while len(vector) < max_plates * (n_tags + 1):
             vector.append(0)
         return vector[:max_plates * (n_tags + 1)]
     
     def decode_vector_to_plates(vector):
-        """Convert vector back to plates with proper names"""
         plates = []
         for i in range(max_plates):
             start_idx = i * (n_tags + 1)
@@ -2322,18 +2400,15 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
                     layout[tag] = max(1, min(ups, capacity))
                     has_positive_ups = True
             
-            # Skip if no valid layout
             if not has_positive_ups:
                 continue
             
-            # Adjust to capacity
             total_ups = sum(layout.values())
             if total_ups > capacity:
                 scale = capacity / total_ups
                 for tag in layout:
                     layout[tag] = max(1, int(layout[tag] * scale))
             
-            # Final capacity adjustment
             while sum(layout.values()) > capacity:
                 max_tag = max(layout, key=layout.get)
                 if layout[max_tag] > 1:
@@ -2350,50 +2425,39 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
             sheets = max(1, int(vector[start_idx + n_tags] * 1000))
             
             plates.append({
-                "name": plate_name(len(plates) + 1),  # IMPORTANT: Add name
+                "name": plate_name(len(plates) + 1),
                 "layout": layout,
                 "sheets": sheets
             })
         
-        # If no plates created, create a default one
-        if not plates:
-            plates = v3_optimizer(demand, capacity, 1)
-        
-        return plates
+        return ensure_demand_met(plates, demand) if plates else v3_optimizer(demand, capacity, max_plates)
     
     def evaluate(plates):
         return calculate_waste_percent(plates, demand)
     
-    # Initialize population with valid solutions
     population = []
     for _ in range(population_size):
-        # Use V3 as base for better initialization
         base_plates = v3_optimizer(demand, capacity, max_plates)
         population.append(encode_plates_to_vector(base_plates))
     
     best_solution = None
     best_waste = float('inf')
     
-    # Main DE loop
     for generation in range(generations):
         new_population = []
         
         for i, target in enumerate(population):
-            # Select three distinct random vectors
             candidates = [idx for idx in range(population_size) if idx != i]
             if len(candidates) < 3:
                 a, b, c = 0, 1, 2
             else:
                 a, b, c = random.sample(candidates, 3)
             
-            # Mutation
             mutant = []
             for j in range(len(target)):
                 val = population[a][j] + F * (population[b][j] - population[c][j])
-                # Clamp values between 0 and 1
                 mutant.append(max(0.0, min(1.0, val)))
             
-            # Crossover
             trial = []
             for j in range(len(target)):
                 if random.random() < CR:
@@ -2401,7 +2465,6 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
                 else:
                     trial.append(target[j])
             
-            # Evaluate
             trial_plates = decode_vector_to_plates(trial)
             trial_waste = evaluate(trial_plates)
             
@@ -2421,16 +2484,11 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
         
         population = new_population
     
-    # Final check: ensure best_solution has valid plates
     if not best_solution:
         best_solution = v3_optimizer(demand, capacity, max_plates)
     
-    # Ensure all plates have names
-    for idx, plate in enumerate(best_solution):
-        if "name" not in plate:
-            plate["name"] = plate_name(idx + 1)
-    
-    return best_solution
+    return ensure_demand_met(best_solution, demand)
+
 
 # ================================================================
 # V25 - MULTI-OBJECTIVE PARETO OPTIMIZER
@@ -2493,7 +2551,7 @@ def v25_optimizer(demand: dict, capacity: int, max_plates: int,
                     last["sheets"] += ceil(remaining[tag] / ups)
                     remaining[tag] = 0
         
-        return Individual(plates)
+        return Individual(ensure_demand_met(plates, demand))
     
     def mutate(individual):
         new_plates = copy.deepcopy(individual.plates)
@@ -2506,7 +2564,7 @@ def v25_optimizer(demand: dict, capacity: int, max_plates: int,
                 if layout[a] > 1:
                     layout[a] -= 1
                     layout[b] += 1
-        return Individual(new_plates)
+        return Individual(ensure_demand_met(new_plates, demand))
     
     def crossover(ind1, ind2):
         point = random.randint(1, min(len(ind1.plates), len(ind2.plates)) - 1)
@@ -2534,7 +2592,7 @@ def v25_optimizer(demand: dict, capacity: int, max_plates: int,
                     last["sheets"] += ceil(remaining[tag] / ups)
                     remaining[tag] = 0
         
-        return Individual(fixed_plates)
+        return Individual(ensure_demand_met(fixed_plates, demand))
     
     def non_dominated_sort(population):
         fronts = []
@@ -2604,7 +2662,6 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
             self.patterns[key].append(waste)
         
         def predict_layout(self, active, capacity):
-            active_items = sorted(active.items())
             best_pattern = None
             best_score = float('inf')
             
@@ -2668,7 +2725,7 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                     last["sheets"] += ceil(remaining[tag] / ups)
                     remaining[tag] = 0
         
-        return plates
+        return ensure_demand_met(plates, demand)
     
     def mutate_with_ml(plates):
         new_plates = copy.deepcopy(plates)
@@ -2681,7 +2738,7 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 if layout[a] > 1:
                     layout[a] -= 1
                     layout[b] += 1
-        return new_plates
+        return ensure_demand_met(new_plates, demand)
     
     def crossover_plates(p1, p2):
         point = random.randint(1, min(len(p1), len(p2)) - 1)
@@ -2709,7 +2766,7 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                     last["sheets"] += ceil(remaining[tag] / ups)
                     remaining[tag] = 0
         
-        return fixed
+        return ensure_demand_met(fixed, demand)
     
     population = []
     for _ in range(population_size):
@@ -2739,7 +2796,7 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         population = new_population
     
     best_idx = min(range(len(population)), key=lambda i: calculate_waste_percent(population[i], demand))
-    return population[best_idx] if population else v18_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(population[best_idx], demand) if population else v18_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -2747,9 +2804,9 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 # ================================================================
 st.markdown("""
 <div class="main-header">
-    <h1>🔬 Advanced Plate Ratio Intelligence System</h1>
-    <p>Experimental & Heavy Algorithms (V19-V26) + All Algorithms</p>
-    <p style="font-size: 0.85rem; opacity: 0.6;">Research Mode • Heavy Computation • 26 Algorithms</p>
+    <h1>📊 Plate Ratio Intelligence System</h1>
+    <p>Complete Edition • 26 Algorithms • Production Ready</p>
+    <p style="font-size: 0.85rem; opacity: 0.6;">AI-Powered • Fast • Accurate</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -2797,7 +2854,7 @@ if not ORTOOLS_AVAILABLE:
 # ================== GENERATE BUTTON ==================
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    generate_clicked = st.button("🔬 Generate Plans (Advanced Mode)", use_container_width=True, type="primary")
+    generate_clicked = st.button("🚀 Generate Plans (All 26 Algorithms)", use_container_width=True, type="primary")
 
 # ================== AFTER GENERATE ==================
 if generate_clicked:
@@ -2805,7 +2862,7 @@ if generate_clicked:
         st.error("⚠️ Please enter at least one item with quantity greater than 0")
         st.stop()
 
-    with st.spinner("🔄 Running all 26 algorithms (Advanced Mode)... This may take 2-5 minutes..."):
+    with st.spinner("🔄 Running all 26 algorithms... This may take 2-5 minutes..."):
         
         # ================== ALL ALGORITHMS V1-V26 ==================
         algo_functions = {
@@ -2826,17 +2883,15 @@ if generate_clicked:
             "V16 - Plate Merge Optimizer": lambda: v16_optimizer(demand, cap, maxp),
             "V17 - AI Evolution Engine": lambda: v17_optimizer(demand, cap, maxp, generations=100),
             "V18 - Global Multi-Plate Optimizer": lambda: v18_optimizer(demand, cap, maxp),
+            "V19 - CP-SAT Optimizer": lambda: v19_optimizer(demand, cap, maxp) if ORTOOLS_AVAILABLE else v18_optimizer(demand, cap, maxp),
+            "V20 - PSO Optimizer": lambda: v20_optimizer(demand, cap, maxp),
+            "V21 - ACO Optimizer": lambda: v21_optimizer(demand, cap, maxp),
+            "V22 - Q-Learning Optimizer": lambda: v22_optimizer(demand, cap, maxp, episodes=20),
+            "V23 - Branch & Bound": lambda: v23_optimizer(demand, cap, maxp),
+            "V24 - Differential Evolution": lambda: v24_optimizer(demand, cap, maxp, population_size=15, generations=30),
+            "V25 - Pareto Optimizer": lambda: v25_optimizer(demand, cap, maxp, population_size=20, generations=30),
+            "V26 - NN Predictor": lambda: v26_optimizer(demand, cap, maxp),
         }
-        
-        # Add V19-V26 (Advanced/Experimental)
-        algo_functions["V19 - CP-SAT Optimizer"] = lambda: v19_optimizer(demand, cap, maxp) if ORTOOLS_AVAILABLE else v18_optimizer(demand, cap, maxp)
-        algo_functions["V20 - PSO Optimizer"] = lambda: v20_optimizer(demand, cap, maxp)
-        algo_functions["V21 - ACO Optimizer"] = lambda: v21_optimizer(demand, cap, maxp)
-        algo_functions["V22 - Q-Learning Optimizer"] = lambda: v22_optimizer(demand, cap, maxp, episodes=20)
-        algo_functions["V23 - Branch & Bound"] = lambda: v23_optimizer(demand, cap, maxp)
-        algo_functions["V24 - Differential Evolution"] = lambda: v24_optimizer(demand, cap, maxp, population_size=15, generations=30)
-        algo_functions["V25 - Pareto Optimizer"] = lambda: v25_optimizer(demand, cap, maxp, population_size=20, generations=30)
-        algo_functions["V26 - NN Predictor"] = lambda: v26_optimizer(demand, cap, maxp)
         
         problematic_for_single_plate = {
             "V11 - Genetic Algorithm", "V16 - Plate Merge Optimizer", "V17 - AI Evolution Engine",
@@ -2865,36 +2920,33 @@ if generate_clicked:
         progress_bar.empty()
         status_text.empty()
         
-        # Ensure all have results
-        for algo_name in list(results.keys()):
-            if not results.get(algo_name):
-                results[algo_name] = v3_optimizer(demand, cap, maxp)
-        
-        # Filter out invalid results
-        valid_results = {}
+        # Global fix for all algorithms
         for algo_name, plates in results.items():
             if plates:
-                waste = calculate_waste_percent(plates, demand)
-                if 0 <= waste <= 100:
-                    valid_results[algo_name] = plates
-                else:
-                    valid_results[algo_name] = v3_optimizer(demand, cap, maxp)
+                results[algo_name] = ensure_demand_met(plates, demand)
             else:
-                valid_results[algo_name] = v3_optimizer(demand, cap, maxp)
-        
-        results = valid_results
+                results[algo_name] = v3_optimizer(demand, cap, maxp)
         
         # Comparison Data
         comparison_data = []
         for algo_name, plates in results.items():
-            waste = calculate_waste_percent(plates, demand)
-            comparison_data.append({
-                "Algorithm": algo_name,
-                "Waste %": waste,
-                "Total Plates": len(plates),
-                "Total Sheets": sum(p.get("sheets", 0) for p in plates),
-                "Status": "✅ Success"
-            })
+            if plates:
+                waste = calculate_waste_percent(plates, demand)
+                comparison_data.append({
+                    "Algorithm": algo_name,
+                    "Waste %": waste,
+                    "Total Plates": len(plates),
+                    "Total Sheets": sum(p.get("sheets", 0) for p in plates),
+                    "Status": "✅ Success"
+                })
+            else:
+                comparison_data.append({
+                    "Algorithm": algo_name,
+                    "Waste %": 100,
+                    "Total Plates": 0,
+                    "Total Sheets": 0,
+                    "Status": "❌ Failed"
+                })
         
         comparison_df = pd.DataFrame(comparison_data).sort_values("Waste %")
         best_algo = comparison_df.iloc[0]["Algorithm"]
@@ -2970,7 +3022,7 @@ if generate_clicked:
                     st.download_button(
                         "📊 Download Excel", 
                         bio_excel,
-                        f"ADVANCED_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                         use_container_width=True
                     )
                 
@@ -2981,7 +3033,7 @@ if generate_clicked:
                             st.download_button(
                                 "📄 Download PDF", 
                                 pdf_buffer,
-                                f"ADVANCED_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                                f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                                 mime="application/pdf", 
                                 use_container_width=True
                             )
@@ -3070,10 +3122,10 @@ if 'results' in st.session_state and st.session_state['results']:
 st.markdown("""
 <div style="text-align: center; padding: 2rem; margin-top: 3rem; border-top: 2px solid rgba(102,126,234,0.3); background: rgba(255,255,255,0.02); border-radius: 20px;">
     <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;">
-        © 2025 Advanced Plate Ratio System | Version 26
+        © 2025 Plate Ratio System | Version 26 (Complete Edition)
     </p>
     <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 8px 0;">
-        🔬 Research Mode • 26 Algorithms • Heavy Computation
+        Enterprise Production Optimization Framework • 26 Algorithms • Production Ready
     </p>
     <p style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 0.85rem; font-weight: 600; margin: 10px 0 0 0;">
         ✨ Developed by Ovi | All Rights Reserved ✨
