@@ -2281,90 +2281,6 @@ def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 
     return ensure_demand_met(result, demand) if result else v3_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V23 - BRANCH AND BOUND OPTIMIZER
-# ================================================================
-def v23_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    tags = list(demand.keys())
-    n_tags = len(tags)
-    
-    if n_tags > 8:
-        return v18_optimizer(demand, capacity, max_plates)
-    
-    best_plates = None
-    best_waste = float('inf')
-    
-    def backtrack(remaining, current_plates, plate_num):
-        nonlocal best_plates, best_waste
-        
-        current_waste = calculate_waste_percent(current_plates, demand) if current_plates else 0
-        if current_waste >= best_waste:
-            return
-        
-        if all(v <= 0 for v in remaining.values()):
-            if current_waste < best_waste:
-                best_waste = current_waste
-                best_plates = copy.deepcopy(current_plates)
-            return
-        
-        if plate_num >= max_plates:
-            if current_plates:
-                last_plate = current_plates[-1]
-                for tag in remaining:
-                    if remaining[tag] > 0:
-                        ups = max(1, last_plate["layout"].get(tag, 1))
-                        last_plate["sheets"] += ceil(remaining[tag] / ups)
-                        remaining[tag] = 0
-                
-                final_waste = calculate_waste_percent(current_plates, demand)
-                if final_waste < best_waste:
-                    best_waste = final_waste
-                    best_plates = copy.deepcopy(current_plates)
-            return
-        
-        active = {k: v for k, v in remaining.items() if v > 0}
-        if not active:
-            return
-        
-        def generate_layouts(current_layout, remaining_cap, start_idx):
-            if remaining_cap == 0 or start_idx >= len(active_tags):
-                yield current_layout.copy()
-                return
-            
-            tag = active_tags[start_idx]
-            max_ups = min(remaining_cap, active[tag])
-            
-            for ups in range(1, max_ups + 1):
-                current_layout[tag] = ups
-                yield from generate_layouts(current_layout, remaining_cap - ups, start_idx + 1)
-            
-            if tag in current_layout:
-                del current_layout[tag]
-            yield from generate_layouts(current_layout, remaining_cap, start_idx + 1)
-        
-        active_tags = list(active.keys())
-        
-        for layout in generate_layouts({}, capacity, 0):
-            if not layout or sum(layout.values()) != capacity:
-                continue
-            
-            sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active_tags if layout.get(t, 0) > 0))
-            
-            new_remaining = remaining.copy()
-            for tag, ups in layout.items():
-                new_remaining[tag] = max(0, new_remaining[tag] - (ups * sheets))
-            
-            new_plates = current_plates.copy()
-            new_plates.append({
-                "name": plate_name(plate_num + 1),
-                "layout": layout,
-                "sheets": sheets
-            })
-            
-            backtrack(new_remaining, new_plates, plate_num + 1)
-    
-    backtrack(demand.copy(), [], 0)
-    return ensure_demand_met(best_plates, demand) if best_plates else v18_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -2887,7 +2803,6 @@ if generate_clicked:
             "V20 - PSO Optimizer": lambda: v20_optimizer(demand, cap, maxp),
             "V21 - ACO Optimizer": lambda: v21_optimizer(demand, cap, maxp),
             "V22 - Q-Learning Optimizer": lambda: v22_optimizer(demand, cap, maxp, episodes=20),
-            "V23 - Branch & Bound": lambda: v23_optimizer(demand, cap, maxp),
             "V24 - Differential Evolution": lambda: v24_optimizer(demand, cap, maxp, population_size=15, generations=30),
             "V25 - Pareto Optimizer": lambda: v25_optimizer(demand, cap, maxp, population_size=20, generations=30),
             "V26 - NN Predictor": lambda: v26_optimizer(demand, cap, maxp),
