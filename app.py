@@ -2778,7 +2778,7 @@ if generate_clicked:
         st.error("⚠️ Please enter at least one item with quantity greater than 0")
         st.stop()
 
-    with st.spinner("🔄 Running all 26 algorithms... This may take 2-5 minutes..."):
+    with st.spinner("🔍 Searching for the perfect plate ratio... Almost there!"):
         
         # ================== ALL ALGORITHMS V1-V26 ==================
         algo_functions = {
@@ -2981,7 +2981,7 @@ if 'results' in st.session_state and st.session_state['results']:
     col1, col2 = st.columns([3, 1])
     with col1:
         selected_algo = st.selectbox(
-            "👇 Select Algorithm to View Report:",
+            "Select Algorithm to View Report:",
             options=algo_list,
             index=default_index,
             key="independent_algo_selector"
