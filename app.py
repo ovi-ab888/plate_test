@@ -2960,10 +2960,22 @@ else:
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
-        "Upload Excel file with Item Names and Quantities",
+        "Upload Excel file with Item Details",
         type=["xlsx", "xls"],
-        help="File must have at least two columns: 'Item' and 'Quantity'. Additional columns (Color, Size, etc.) are optional."
+        help="File must have columns: SL, Style, Color, Size, Quantity"
     )
+    
+    # Show sample format
+    with st.expander("📋 View Sample Excel Format"):
+        sample_data = pd.DataFrame({
+            "SL": [1, 2, 3, 4, 5],
+            "Style": ["Style A", "Style B", "Style C", "Style D", "Style E"],
+            "Color": ["Red", "Blue", "Green", "Black", "White"],
+            "Size": ["M", "L", "XL", "S", "M"],
+            "Quantity": [100, 200, 150, 300, 250]
+        })
+        st.dataframe(sample_data, use_container_width=True)
+        st.caption("📌 Columns: SL, Style, Color, Size, Quantity (Quantity is required)")
     
     if uploaded_file is not None:
         try:
@@ -2972,65 +2984,82 @@ else:
             # Remove completely empty rows
             df = df.dropna(how='all')
             
-            # Find Item column (try common names)
-            item_col = None
-            quantity_col = None
+            # Auto-detect columns
+            # Look for required columns
+            style_col = None
+            color_col = None
+            size_col = None
+            qty_col = None
+            sl_col = None
             
-            # Look for Item column
             for col in df.columns:
                 col_lower = str(col).lower().strip()
-                if col_lower in ['item', 'product', 'name', 'items', 'products', 'code']:
-                    item_col = col
-                    break
+                if col_lower in ['style', 'styles']:
+                    style_col = col
+                elif col_lower in ['color', 'colors', 'colour']:
+                    color_col = col
+                elif col_lower in ['size', 'sizes']:
+                    size_col = col
+                elif col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total']:
+                    qty_col = col
+                elif col_lower in ['sl', 's/l', 'serial', 'serial no', 'serial no.', 'no']:
+                    sl_col = col
             
-            # If not found, use first column
-            if item_col is None and len(df.columns) >= 1:
-                item_col = df.columns[0]
+            # If specific columns not found, try to map by position
+            if qty_col is None and len(df.columns) >= 2:
+                # Try to find quantity column (usually the last column with numbers)
+                for col in df.columns:
+                    if df[col].dtype in ['int64', 'float64']:
+                        qty_col = col
+                        break
             
-            # Look for Quantity column
-            for col in df.columns:
-                col_lower = str(col).lower().strip()
-                if col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total']:
-                    quantity_col = col
-                    break
+            # If still not found, use last column as quantity
+            if qty_col is None and len(df.columns) >= 2:
+                qty_col = df.columns[-1]
             
-            # If not found, use second column
-            if quantity_col is None and len(df.columns) >= 2:
-                quantity_col = df.columns[1]
+            # If style/color/size not found, use empty strings or create from SL
+            if style_col is None:
+                style_col = df.columns[1] if len(df.columns) >= 2 else None
+            if color_col is None:
+                color_col = df.columns[2] if len(df.columns) >= 3 else None
+            if size_col is None:
+                size_col = df.columns[3] if len(df.columns) >= 4 else None
             
-            # If still not found, show error
-            if item_col is None or quantity_col is None:
-                st.error("❌ Could not find 'Item' and 'Quantity' columns. Please ensure your file has at least 2 columns.")
-                st.info("📌 Column names can be: 'Item'/'Product'/'Name' and 'Quantity'/'Qty'")
+            if qty_col is None:
+                st.error("❌ Could not find 'Quantity' column. Please ensure your file has a quantity column.")
+                st.info("📌 Column names can be: 'Quantity', 'Qty', 'QTY', 'Total'")
                 st.stop()
             
             # Extract data
-            items = df[item_col].astype(str).tolist()
-            quantities = df[quantity_col].tolist()
+            sl_data = df[sl_col].tolist() if sl_col else list(range(1, len(df) + 1))
+            style_data = df[style_col].astype(str).tolist() if style_col else ["N/A"] * len(df)
+            color_data = df[color_col].astype(str).tolist() if color_col else ["N/A"] * len(df)
+            size_data = df[size_col].astype(str).tolist() if size_col else ["N/A"] * len(df)
+            qty_data = df[qty_col].tolist()
             
             # Clean data: remove NaN, empty strings, and non-numeric quantities
             cleaned_data = []
             skipped_rows = 0
             
-            for idx, (item, qty) in enumerate(zip(items, quantities)):
-                # Skip if item is empty or NaN
-                if pd.isna(item) or str(item).strip() == '':
-                    skipped_rows += 1
-                    continue
-                
+            for idx, (sl, style, color, size, qty) in enumerate(zip(sl_data, style_data, color_data, size_data, qty_data)):
                 # Skip if quantity is NaN or invalid
                 if pd.isna(qty):
                     skipped_rows += 1
                     continue
                 
                 try:
-                    qty_int = int(float(qty))  # Convert to int (handles decimal numbers too)
+                    qty_int = int(float(qty))  # Convert to int
                     if qty_int > 0:  # Only keep positive quantities
-                        cleaned_data.append((str(item).strip(), qty_int))
+                        # Clean up values
+                        style_val = str(style).strip() if not pd.isna(style) and str(style).strip() != '' else "N/A"
+                        color_val = str(color).strip() if not pd.isna(color) and str(color).strip() != '' else "N/A"
+                        size_val = str(size).strip() if not pd.isna(size) and str(size).strip() != '' else "N/A"
+                        sl_val = int(sl) if not pd.isna(sl) and str(sl).strip() != '' else idx + 1
+                        
+                        cleaned_data.append((sl_val, style_val, color_val, size_val, qty_int))
                     else:
                         skipped_rows += 1
                 except (ValueError, TypeError):
-                    # Skip if quantity can't be converted to number
                     skipped_rows += 1
                     continue
             
@@ -3039,28 +3068,51 @@ else:
                 st.stop()
             
             # Separate into lists
-            items = [item for item, _ in cleaned_data]
-            quantities = [qty for _, qty in cleaned_data]
+            sl_list = [item[0] for item in cleaned_data]
+            style_list = [item[1] for item in cleaned_data]
+            color_list = [item[2] for item in cleaned_data]
+            size_list = [item[3] for item in cleaned_data]
+            qty_list = [item[4] for item in cleaned_data]
             
             # Show preview
             preview_df = pd.DataFrame({
-                "Item": items,
-                "Quantity": quantities
+                "SL": sl_list,
+                "Style": style_list,
+                "Color": color_list,
+                "Size": size_list,
+                "Quantity": qty_list
             })
             
-            st.success(f"✅ File loaded successfully! {len(items)} valid items found.")
+            st.success(f"✅ File loaded successfully! {len(cleaned_data)} valid items found.")
             if skipped_rows > 0:
                 st.warning(f"⚠️ {skipped_rows} rows were skipped (empty or invalid data).")
             
             st.dataframe(preview_df, use_container_width=True)
             
-            # Also show original columns detected
-            st.info(f"📋 Detected columns: Item = '{item_col}', Quantity = '{quantity_col}'")
+            # Detected columns info
+            detected_cols = []
+            if sl_col:
+                detected_cols.append(f"SL = '{sl_col}'")
+            if style_col:
+                detected_cols.append(f"Style = '{style_col}'")
+            if color_col:
+                detected_cols.append(f"Color = '{color_col}'")
+            if size_col:
+                detected_cols.append(f"Size = '{size_col}'")
+            if qty_col:
+                detected_cols.append(f"Quantity = '{qty_col}'")
+            
+            st.info(f"📋 Detected columns: {', '.join(detected_cols)}")
             
             # Auto-set the number of items
-            n = len(items)
-            tags = items
-            qty = quantities
+            n = len(cleaned_data)
+            tags = [f"Item {i+1}" for i in range(n)]
+            qty = qty_list
+            
+            # Store style/color/size data in session state for PDF
+            st.session_state['item_styles'] = {f"Item {i+1}": style_list[i] for i in range(n)}
+            st.session_state['item_colors'] = {f"Item {i+1}": color_list[i] for i in range(n)}
+            st.session_state['item_sizes'] = {f"Item {i+1}": size_list[i] for i in range(n)}
             
             original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
             demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
@@ -3073,6 +3125,7 @@ else:
         st.stop()
 
 st.markdown('</div>', unsafe_allow_html=True)
+
 # ================== WARNING MESSAGES ==================
 if not PULP_AVAILABLE:
     st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
