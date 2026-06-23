@@ -1596,10 +1596,11 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 # V15 - Dynamic Programming Repair Engine
 # ================================================================
 def v15_optimizer(demand: dict, capacity: int, max_plates: int):
-    base = v14_optimizer(demand, capacity, max_plates)
+    # Use V3 as base instead of V14
+    base = v3_optimizer(demand, capacity, max_plates)
 
     if not base:
-        return v13_optimizer(demand, capacity, max_plates)
+        return v3_optimizer(demand, capacity, max_plates)
 
     best = copy.deepcopy(base)
     best_waste = calculate_waste_percent(best, demand)
@@ -1639,7 +1640,7 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
     plates = v15_optimizer(demand, capacity, max_plates)
 
     if not plates:
-        return v13_optimizer(demand, capacity, max_plates)
+        return v3_optimizer(demand, capacity, max_plates)
 
     merged = []
     skip = set()
@@ -1676,11 +1677,11 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
 def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 200):
     population = []
 
+    # Only use available algorithms
+    available_algos = [v3_optimizer, v5_optimizer, v11_optimizer, v15_optimizer, v16_optimizer]
+    
     for _ in range(20):
-        candidate = random.choice([
-            v3_optimizer, v5_optimizer, v9_optimizer,
-            v11_optimizer, v13_optimizer, v15_optimizer, v16_optimizer
-        ])(demand, capacity, max_plates)
+        candidate = random.choice(available_algos)(demand, capacity, max_plates)
         population.append(candidate)
 
     best_solution = None
@@ -1722,7 +1723,7 @@ def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int
 
         population = new_population
 
-    return ensure_demand_met(best_solution, demand) if best_solution else v13_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_solution, demand) if best_solution else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1731,7 +1732,8 @@ def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int
 def v18_optimizer(demand: dict, capacity: int, max_plates: int):
     candidates = []
 
-    algos = [v14_optimizer, v15_optimizer, v16_optimizer, v17_optimizer, v13_optimizer, v11_optimizer, v9_optimizer]
+    # Only use available algorithms
+    algos = [v3_optimizer, v5_optimizer, v11_optimizer, v15_optimizer, v16_optimizer, v17_optimizer]
 
     for algo in algos:
         try:
@@ -1743,7 +1745,7 @@ def v18_optimizer(demand: dict, capacity: int, max_plates: int):
             pass
 
     if not candidates:
-        return v13_optimizer(demand, capacity, max_plates)
+        return v3_optimizer(demand, capacity, max_plates)
 
     candidates.sort(key=lambda x: x[0])
     return ensure_demand_met(candidates[0][1], demand)
