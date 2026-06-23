@@ -844,16 +844,23 @@ def proportional_layout_v4(remaining: dict, capacity: int) -> dict:
         layout[tag] = base
         decimal_map[tag] = ideal - int(ideal)
 
+    # ✅ Exact capacity enforce
     while sum(layout.values()) > capacity:
-        biggest = max(layout, key=layout.get)
-        if layout[biggest] > 1:
-            layout[biggest] -= 1
+        # সবচেয়ে বড় UPS কে কমাও
+        max_tag = max(layout, key=layout.get)
+        if layout[max_tag] > 1:
+            layout[max_tag] -= 1
         else:
-            break
+            # যদি সব UPS 1 হয়, তাহলে সবচেয়ে ছোট Tag-কে 0 করো
+            min_tag = min(layout, key=layout.get)
+            if layout[min_tag] > 0:
+                layout[min_tag] -= 1
+            else:
+                break
 
     while sum(layout.values()) < capacity:
         best = max(decimal_map, key=decimal_map.get)
-        layout[best] += 1
+        layout[best] = layout.get(best, 0) + 1
         decimal_map[best] = 0
 
     return layout
@@ -873,6 +880,11 @@ def v4_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 break
 
             layout = proportional_layout_v4(active, capacity)
+            
+            # ✅ Check if layout is valid
+            if not layout or sum(layout.values()) != capacity:
+                break
+            
             possible = [ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0]
 
             if not possible:
