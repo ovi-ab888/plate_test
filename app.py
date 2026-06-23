@@ -2779,17 +2779,7 @@ else:
         help="File must have columns: SL, Style, Color, Size, Quantity"
     )
     
-    # Show sample format
-    with st.expander("📋 View Sample Excel Format"):
-        sample_data = pd.DataFrame({
-            "SL": [1, 2, 3, 4, 5],
-            "Style": ["Style A", "Style B", "Style C", "Style D", "Style E"],
-            "Color": ["Red", "Blue", "Green", "Black", "White"],
-            "Size": ["M", "L", "XL", "S", "M"],
-            "Quantity": [100, 200, 150, 300, 250]
-        })
-        st.dataframe(sample_data, use_container_width=True)
-        st.caption("📌 Columns: SL, Style, Color, Size, Quantity (Quantity is required)")
+
     
     if uploaded_file is not None:
         try:
