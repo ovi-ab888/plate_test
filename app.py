@@ -820,17 +820,35 @@ def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         if not active:
             break
 
-        # ✅ Use helper function
+        # ✅ Fixed: Use create_valid_layout
         layout = create_valid_layout(active, capacity, "greedy")
         
-        possible_sheets = [ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0]
+        # ✅ Extra safety check
+        if sum(layout.values()) != capacity:
+            layout = create_valid_layout(active, capacity, "balanced")
+        
+        # Calculate sheets
+        possible_sheets = []
+        for tag, ups in layout.items():
+            if ups > 0 and remaining.get(tag, 0) > 0:
+                possible_sheets.append(ceil(remaining[tag] / ups))
+        
+        if not possible_sheets:
+            break
+            
         sheets = max(1, min(possible_sheets))
 
+        # Update remaining
         for tag, ups in layout.items():
             remaining[tag] = max(0, remaining[tag] - (ups * sheets))
 
-        plates.append({"name": plate_name(len(plates) + 1), "layout": layout, "sheets": sheets})
+        plates.append({
+            "name": plate_name(len(plates) + 1),
+            "layout": layout,
+            "sheets": sheets
+        })
 
+    # Handle remaining demand
     if any(v > 0 for v in remaining.values()) and plates:
         last = plates[-1]
         for tag in remaining:
@@ -839,9 +857,10 @@ def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
                 add_sheets = ceil(remaining[tag] / ups)
                 last["sheets"] += add_sheets
                 remaining[tag] = 0
+    elif any(v > 0 for v in remaining.values()):
+        return v3_optimizer(demand, capacity, max_plates)
 
     return ensure_demand_met(plates, demand)
-
 def build_balanced_layout_v3(remaining: dict, capacity: int) -> dict:
     active = {k: v for k, v in remaining.items() if v > 0}
     if not active:
