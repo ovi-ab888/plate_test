@@ -2950,7 +2950,7 @@ if not ORTOOLS_AVAILABLE:
 # ================== GENERATE BUTTON ==================
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    generate_clicked = st.button("🚀 Generate Plans (All 26 Algorithms)", use_container_width=True, type="primary")
+    generate_clicked = st.button("Generate Plans", use_container_width=True, type="primary")
 
 # ================== AFTER GENERATE ==================
 if generate_clicked:
