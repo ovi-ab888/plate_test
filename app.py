@@ -1288,159 +1288,7 @@ def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
     return ensure_demand_met(plates, demand)
 
 
-# ================================================================
-# V9 - Hybrid Ratio & Sheet Repair Engine
-# ================================================================
-def v9_optimizer(demand: dict, capacity: int, max_plates: int, repair_iterations: int = 50) -> list:
-    remaining = copy.deepcopy(demand)
-    plates = []
 
-    for p_num in range(max_plates):
-        active = {k: v for k, v in remaining.items() if v > 0}
-        if not active:
-            break
-
-        total_active_qty = sum(active.values())
-        layout = {}
-
-        for tag, qty in active.items():
-            ideal = (qty / total_active_qty) * capacity
-            layout[tag] = max(1, floor(ideal))
-
-        while sum(layout.values()) < capacity:
-            highest_needed = max(active, key=lambda t: active[t] / layout[t])
-            layout[highest_needed] += 1
-
-        while sum(layout.values()) > capacity:
-            biggest_slot = max(layout, key=layout.get)
-            if layout[biggest_slot] > 1:
-                layout[biggest_slot] -= 1
-            else:
-                break
-
-        sheets = max(1, min(ceil(active[t] / layout[t]) for t in layout if layout[t] > 0))
-        best_layout = layout.copy()
-        best_sheets = sheets
-
-        for _ in range(repair_iterations):
-            candidate_layout = best_layout.copy()
-            tags = list(candidate_layout.keys())
-
-            if len(tags) >= 2:
-                a, b = random.sample(tags, 2)
-
-                if candidate_layout[a] > 1:
-                    candidate_layout[a] -= 1
-                    candidate_layout[b] += 1
-
-                    candidate_sheets = max(1, min(
-                        ceil(active[t] / candidate_layout[t]) for t in candidate_layout if candidate_layout[t] > 0
-                    ))
-
-                    cand_waste = sum(max(0, candidate_layout[t] * candidate_sheets - active.get(t, 0)) for t in candidate_layout)
-                    best_waste = sum(max(0, best_layout[t] * best_sheets - active.get(t, 0)) for t in best_layout)
-
-                    if cand_waste < best_waste or (cand_waste == best_waste and candidate_sheets < best_sheets):
-                        best_layout = candidate_layout.copy()
-                        best_sheets = candidate_sheets
-
-        plates.append({
-            "name": plate_name(len(plates) + 1),
-            "layout": best_layout,
-            "sheets": best_sheets
-        })
-
-        for tag, ups in best_layout.items():
-            remaining[tag] = max(0, remaining[tag] - (ups * best_sheets))
-
-    if any(v > 0 for v in remaining.values()) and plates:
-        last = plates[-1]
-        for tag in remaining:
-            if remaining[tag] > 0:
-                ups = max(1, last["layout"].get(tag, 1))
-                last["sheets"] += ceil(remaining[tag] / ups)
-                remaining[tag] = 0
-
-    return ensure_demand_met(plates, demand)
-
-
-# ================================================================
-# V10 - Exhaustive Search
-# ================================================================
-def v10_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    items = list(demand.keys())
-    n_items = len(items)
-    
-    if n_items > 5:
-        return v3_optimizer(demand, capacity, max_plates)
-    
-    best_waste = float('inf')
-    best_plates = None
-    
-    def generate_layouts(current_layout, remaining_cap, start_idx):
-        if remaining_cap == 0 or start_idx >= n_items:
-            yield current_layout.copy()
-            return
-        
-        tag = items[start_idx]
-        max_ups = min(remaining_cap, demand[tag])
-        
-        for ups in range(1, max_ups + 1):
-            current_layout[tag] = ups
-            yield from generate_layouts(current_layout, remaining_cap - ups, start_idx + 1)
-        
-        if tag in current_layout:
-            del current_layout[tag]
-        yield from generate_layouts(current_layout, remaining_cap, start_idx + 1)
-    
-    for num_plates in range(1, max_plates + 1):
-        remaining = demand.copy()
-        plates = []
-        
-        for p in range(num_plates):
-            active = {k: v for k, v in remaining.items() if v > 0}
-            if not active:
-                break
-            
-            best_layout_for_plate = None
-            best_waste_for_plate = float('inf')
-            
-            for layout in generate_layouts({}, capacity, 0):
-                if not layout or sum(layout.values()) != capacity:
-                    continue
-                
-                sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
-                waste = sum(max(0, layout.get(tag, 0) * sheets - remaining.get(tag, 0)) for tag in active)
-                
-                if waste < best_waste_for_plate:
-                    best_waste_for_plate = waste
-                    best_layout_for_plate = layout.copy()
-            
-            if best_layout_for_plate:
-                sheets = max(1, min(ceil(remaining[tag] / best_layout_for_plate.get(tag, 1)) for tag in active))
-                plates.append({
-                    "name": plate_name(len(plates) + 1),
-                    "layout": best_layout_for_plate,
-                    "sheets": sheets
-                })
-                
-                for tag, ups in best_layout_for_plate.items():
-                    remaining[tag] = max(0, remaining[tag] - (ups * sheets))
-        
-        if any(v > 0 for v in remaining.values()) and plates:
-            last = plates[-1]
-            for tag in remaining:
-                if remaining[tag] > 0:
-                    ups = max(1, last["layout"].get(tag, 1))
-                    last["sheets"] += ceil(remaining[tag] / ups)
-                    remaining[tag] = 0
-        
-        waste = calculate_waste_percent(plates, demand)
-        if waste < best_waste:
-            best_waste = waste
-            best_plates = plates
-    
-    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -1742,40 +1590,6 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     return ensure_demand_met(plates, demand) if plates else v3_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V13 - Hybrid Master Optimizer
-# ================================================================
-def v13_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    candidates = []
-    
-    candidates.append(("v3", v3_optimizer(demand, capacity, max_plates)))
-    candidates.append(("v9", v9_optimizer(demand, capacity, max_plates)))
-    candidates.append(("v11", v11_optimizer(demand, capacity, max_plates, population_size=30, generations=50)))
-    
-    if len(demand) <= 5:
-        candidates.append(("v10", v10_optimizer(demand, capacity, max_plates)))
-    
-    if PULP_AVAILABLE:
-        candidates.append(("v12", v12_optimizer(demand, capacity, max_plates)))
-    
-    best_waste = float('inf')
-    best_plates = None
-    
-    for name, plates in candidates:
-        if plates:
-            waste = calculate_waste_percent(plates, demand)
-            if waste < best_waste:
-                best_waste = waste
-                best_plates = plates
-    
-    return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
-
-
-# ================================================================
-# V14 - Base Optimizer
-# ================================================================
-def v14_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    return v13_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
@@ -3156,11 +2970,8 @@ if generate_clicked:
             "V6 - Integer Solver": lambda: v6_optimizer(demand, cap, maxp) if PULP_AVAILABLE else v3_optimizer(demand, cap, maxp),
             "V7 - Simulated Annealing": lambda: v7_optimizer(demand, cap, maxp, iterations=100),
             "V8 - MCTS Tree Search": lambda: v8_optimizer(demand, cap, maxp, iterations=50),
-            "V9 - Hybrid Ratio & Sheet Repair": lambda: v9_optimizer(demand, cap, maxp),
-            "V10 - Exhaustive Search": lambda: v10_optimizer(demand, cap, maxp),
             "V11 - Genetic Algorithm": lambda: v11_optimizer(demand, cap, maxp, population_size=20, generations=30),
             "V12 - Column Generation": lambda: v12_optimizer(demand, cap, maxp) if PULP_AVAILABLE else v3_optimizer(demand, cap, maxp),
-            "V13 - Hybrid Master": lambda: v13_optimizer(demand, cap, maxp),
             "V15 - DP Repair Engine": lambda: v15_optimizer(demand, cap, maxp),
             "V16 - Plate Merge Optimizer": lambda: v16_optimizer(demand, cap, maxp),
             "V17 - AI Evolution Engine": lambda: v17_optimizer(demand, cap, maxp, generations=100),
