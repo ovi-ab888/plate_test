@@ -2780,7 +2780,7 @@ else:
     uploaded_file = st.file_uploader(
         "Upload Excel file with Item Names and Quantities",
         type=["xlsx", "xls"],
-        help="File must have two columns: 'Item' and 'Quantity'"
+        help="File must have at least two columns: 'Item' and 'Quantity'. Additional columns (Color, Size, etc.) are optional."
     )
     
     if uploaded_file is not None:
@@ -2790,35 +2790,66 @@ else:
             # Remove completely empty rows
             df = df.dropna(how='all')
             
-            # Auto-detect columns
-            if "Item" in df.columns and "Quantity" in df.columns:
-                items = df["Item"].astype(str).tolist()
-                quantities = df["Quantity"].tolist()
-            elif len(df.columns) >= 2:
-                # Assume first column = Item, second column = Quantity
-                items = df.iloc[:, 0].astype(str).tolist()
-                quantities = df.iloc[:, 1].tolist()
-            else:
-                st.error("❌ Excel file must have at least 2 columns (Item and Quantity)")
+            # Find Item column (try common names)
+            item_col = None
+            quantity_col = None
+            
+            # Look for Item column
+            for col in df.columns:
+                col_lower = str(col).lower().strip()
+                if col_lower in ['item', 'product', 'name', 'items', 'products', 'code']:
+                    item_col = col
+                    break
+            
+            # If not found, use first column
+            if item_col is None and len(df.columns) >= 1:
+                item_col = df.columns[0]
+            
+            # Look for Quantity column
+            for col in df.columns:
+                col_lower = str(col).lower().strip()
+                if col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total']:
+                    quantity_col = col
+                    break
+            
+            # If not found, use second column
+            if quantity_col is None and len(df.columns) >= 2:
+                quantity_col = df.columns[1]
+            
+            # If still not found, show error
+            if item_col is None or quantity_col is None:
+                st.error("❌ Could not find 'Item' and 'Quantity' columns. Please ensure your file has at least 2 columns.")
+                st.info("📌 Column names can be: 'Item'/'Product'/'Name' and 'Quantity'/'Qty'")
                 st.stop()
+            
+            # Extract data
+            items = df[item_col].astype(str).tolist()
+            quantities = df[quantity_col].tolist()
             
             # Clean data: remove NaN, empty strings, and non-numeric quantities
             cleaned_data = []
-            for item, qty in zip(items, quantities):
+            skipped_rows = 0
+            
+            for idx, (item, qty) in enumerate(zip(items, quantities)):
                 # Skip if item is empty or NaN
                 if pd.isna(item) or str(item).strip() == '':
+                    skipped_rows += 1
                     continue
                 
                 # Skip if quantity is NaN or invalid
                 if pd.isna(qty):
+                    skipped_rows += 1
                     continue
                 
                 try:
                     qty_int = int(float(qty))  # Convert to int (handles decimal numbers too)
                     if qty_int > 0:  # Only keep positive quantities
                         cleaned_data.append((str(item).strip(), qty_int))
+                    else:
+                        skipped_rows += 1
                 except (ValueError, TypeError):
                     # Skip if quantity can't be converted to number
+                    skipped_rows += 1
                     continue
             
             if not cleaned_data:
@@ -2834,8 +2865,15 @@ else:
                 "Item": items,
                 "Quantity": quantities
             })
+            
             st.success(f"✅ File loaded successfully! {len(items)} valid items found.")
+            if skipped_rows > 0:
+                st.warning(f"⚠️ {skipped_rows} rows were skipped (empty or invalid data).")
+            
             st.dataframe(preview_df, use_container_width=True)
+            
+            # Also show original columns detected
+            st.info(f"📋 Detected columns: Item = '{item_col}', Quantity = '{quantity_col}'")
             
             # Auto-set the number of items
             n = len(items)
@@ -2853,7 +2891,6 @@ else:
         st.stop()
 
 st.markdown('</div>', unsafe_allow_html=True)
-
 # ================== WARNING MESSAGES ==================
 if not PULP_AVAILABLE:
     st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
