@@ -314,6 +314,136 @@ st.markdown("""
 # ================================================================
 # HELPER FUNCTIONS
 # ================================================================
+# ================================================================
+# UNIVERSAL LAYOUT GENERATOR (FIXED FOR ALL ALGORITHMS)
+# ================================================================
+def create_valid_layout(active: dict, capacity: int, method: str = "balanced") -> dict:
+    """
+    Create a layout that respects capacity even when items > capacity
+    Methods: "balanced", "proportional", "greedy"
+    """
+    if not active:
+        return {}
+    
+    total_qty = sum(active.values())
+    n_items = len(active)
+    
+    # Special case: বেশি আইটেম, কম capacity
+    if n_items > capacity:
+        layout = {}
+        
+        if method == "balanced":
+            # প্রতিটি আইটেমের জন্য প্রপোরশনাল UPS
+            for tag, qty in active.items():
+                ups = max(1, int((qty / total_qty) * capacity))
+                layout[tag] = ups
+            
+            # Exact capacity enforce
+            while sum(layout.values()) > capacity:
+                max_tag = max(layout, key=layout.get)
+                if layout[max_tag] > 1:
+                    layout[max_tag] -= 1
+                else:
+                    # সব UPS 1 হলে, সবচেয়ে কম গুরুত্বপূর্ণ ট্যাগ 0 করো
+                    min_tag = min(active, key=lambda t: active[t])
+                    if layout.get(min_tag, 0) > 0:
+                        layout[min_tag] = 0
+                    else:
+                        break
+            
+            while sum(layout.values()) < capacity:
+                # সবচেয়ে বেশি ডিমান্ডের আইটেমকে প্রায়োরিটি দাও
+                max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
+                layout[max_tag] = layout.get(max_tag, 0) + 1
+            
+            return layout
+        
+        elif method == "greedy":
+            # প্রতিটি আইটেমের জন্য 1 করে দাও, তারপর বাকি capacity পূরণ করো
+            for tag in active.keys():
+                layout[tag] = 1
+            
+            remaining_cap = capacity - sum(layout.values())
+            
+            if remaining_cap > 0:
+                sorted_items = sorted(active.items(), key=lambda x: x[1], reverse=True)
+                for tag, _ in sorted_items:
+                    if remaining_cap <= 0:
+                        break
+                    layout[tag] = layout.get(tag, 1) + 1
+                    remaining_cap -= 1
+            
+            return layout
+        
+        elif method == "proportional":
+            # প্রপোরশনাল ভাগাভাগি
+            for tag, qty in active.items():
+                ups = int((qty / total_qty) * capacity)
+                if ups < 1:
+                    ups = 1 if len(active) <= capacity else 0
+                layout[tag] = ups
+            
+            # Exact capacity enforce
+            while sum(layout.values()) > capacity:
+                max_tag = max(layout, key=layout.get)
+                if layout[max_tag] > 1:
+                    layout[max_tag] -= 1
+                else:
+                    break
+            
+            while sum(layout.values()) < capacity:
+                max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
+                layout[max_tag] = layout.get(max_tag, 0) + 1
+            
+            return layout
+    
+    # Normal case: আইটেম সংখ্যা capacity এর কম বা সমান
+    layout = {}
+    
+    if method == "balanced":
+        for tag, qty in active.items():
+            ideal = (qty / total_qty) * capacity
+            base = int(ideal)
+            if base < 1:
+                base = 1
+            layout[tag] = base
+        
+        # Adjust to exact capacity
+        while sum(layout.values()) > capacity:
+            max_tag = max(layout, key=layout.get)
+            if layout[max_tag] > 1:
+                layout[max_tag] -= 1
+            else:
+                break
+        
+        while sum(layout.values()) < capacity:
+            # সবচেয়ে বেশি fractional part যার
+            fractional = {}
+            for tag, qty in active.items():
+                ideal = (qty / total_qty) * capacity
+                fractional[tag] = ideal - int(ideal)
+            best = max(fractional, key=fractional.get)
+            layout[best] = layout.get(best, 0) + 1
+    
+    else:  # proportional or greedy
+        for tag, qty in active.items():
+            ups = max(1, int((qty / total_qty) * capacity))
+            layout[tag] = ups
+        
+        while sum(layout.values()) > capacity:
+            max_tag = max(layout, key=layout.get)
+            if layout[max_tag] > 1:
+                layout[max_tag] -= 1
+            else:
+                break
+        
+        while sum(layout.values()) < capacity:
+            max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
+            layout[max_tag] = layout.get(max_tag, 0) + 1
+    
+    return layout
+    
+
 def plate_name(n: int) -> str:
     """Convert number to Excel-style column name (A, B, C, ..., Z, AA, AB, ...)"""
     n -= 1
@@ -645,24 +775,23 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         return None
 
 
-# ================================================================
-# V1 - Plate Ratio System
-# ================================================================
 def smart_layout_v1(demand: dict, cap: int) -> dict:
     total = sum(demand.values())
     if total == 0:
         return {}
 
-    floor_vals, remainders = {}, {}
-    for k, v in demand.items():
-        ratio = (v / total) * cap
-        floor_vals[k] = floor(ratio)
-        remainders[k] = ratio - floor_vals[k]
-
-    layout = dict(floor_vals)
+    # ✅ Use helper function
+    layout = create_valid_layout(demand, cap, "balanced")
+    
+    # Ensure no zero values
     for k in layout:
         if layout[k] == 0:
             layout[k] = 1
+
+    remainders = {}
+    for k, v in demand.items():
+        ratio = (v / total) * cap
+        remainders[k] = ratio - int(ratio)
 
     while sum(layout.values()) > cap:
         biggest = max(layout, key=layout.get)
@@ -674,48 +803,12 @@ def smart_layout_v1(demand: dict, cap: int) -> dict:
     remaining_cap = cap - sum(layout.values())
     while remaining_cap > 0:
         best = max(remainders, key=remainders.get)
-        layout[best] += 1
+        layout[best] = layout.get(best, 0) + 1
         remainders[best] = 0
         remaining_cap -= 1
 
     return layout
 
-
-def v1_optimizer(demand: dict, cap: int, max_plates: int) -> list:
-    remaining = demand.copy()
-    plates = []
-
-    for i in range(max_plates):
-        if not any(v > 0 for v in remaining.values()):
-            break
-
-        layout = smart_layout_v1(remaining, cap)
-        if not layout:
-            break
-
-        possible = [ceil(remaining[k] / v) for k, v in layout.items() if v > 0]
-        sheets = max(1, min(possible))
-
-        for k, v in layout.items():
-            remaining[k] = max(0, remaining[k] - (v * sheets))
-
-        plates.append({"name": plate_name(len(plates) + 1), "layout": layout, "sheets": sheets})
-
-    if any(v > 0 for v in remaining.values()) and plates:
-        last = plates[-1]
-        for k in remaining:
-            if remaining[k] > 0:
-                per_sheet = max(1, last["layout"].get(k, 1))
-                add_sheets = ceil(remaining[k] / per_sheet)
-                last["sheets"] += add_sheets
-                remaining[k] = 0
-
-    return ensure_demand_met(plates, demand)
-
-
-# ================================================================
-# V2 - Common Sheet Optimizer
-# ================================================================
 def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     total_qty = sum(demand.values())
     target_sheets = ceil(total_qty / capacity)
@@ -727,20 +820,9 @@ def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         if not active:
             break
 
-        ideal = {tag: qty / target_sheets for tag, qty in active.items()}
-        layout = {k: max(1, round(v)) for k, v in ideal.items()}
-
-        while sum(layout.values()) > capacity:
-            biggest = max(layout, key=layout.get)
-            if layout[biggest] > 1:
-                layout[biggest] -= 1
-            else:
-                break
-
-        while sum(layout.values()) < capacity:
-            biggest = max(active, key=active.get)
-            layout[biggest] += 1
-
+        # ✅ Use helper function
+        layout = create_valid_layout(active, capacity, "greedy")
+        
         possible_sheets = [ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0]
         sheets = max(1, min(possible_sheets))
 
@@ -760,40 +842,13 @@ def v2_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 
     return ensure_demand_met(plates, demand)
 
-
-# ================================================================
-# V3 - Smart Decimal Balancing
-# ================================================================
 def build_balanced_layout_v3(remaining: dict, capacity: int) -> dict:
     active = {k: v for k, v in remaining.items() if v > 0}
     if not active:
         return {}
 
-    total_qty = sum(active.values())
-    layout, decimals = {}, {}
-
-    for tag, qty in active.items():
-        ideal = (qty / total_qty) * capacity
-        base = int(ideal)
-        if base < 1:
-            base = 1
-        layout[tag] = base
-        decimals[tag] = ideal - int(ideal)
-
-    while sum(layout.values()) > capacity:
-        biggest = max(layout, key=layout.get)
-        if layout[biggest] > 1:
-            layout[biggest] -= 1
-        else:
-            break
-
-    while sum(layout.values()) < capacity:
-        best = max(decimals, key=decimals.get)
-        layout[best] += 1
-        decimals[best] = 0
-
-    return layout
-
+    # ✅ Use helper function
+    return create_valid_layout(active, capacity, "balanced")
 
 def v3_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     remaining = demand.copy()
@@ -825,46 +880,13 @@ def v3_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     return ensure_demand_met(plates, demand)
 
 
-# ================================================================
-# V4 - Multi-Variation Optimizer
-# ================================================================
 def proportional_layout_v4(remaining: dict, capacity: int) -> dict:
     active = {k: v for k, v in remaining.items() if v > 0}
     if not active:
         return {}
 
-    total_qty = sum(active.values())
-    layout, decimal_map = {}, {}
-
-    for tag, qty in active.items():
-        ideal = (qty / total_qty) * capacity
-        base = int(ideal)
-        if base < 1:
-            base = 1
-        layout[tag] = base
-        decimal_map[tag] = ideal - int(ideal)
-
-    # ✅ Exact capacity enforce
-    while sum(layout.values()) > capacity:
-        # সবচেয়ে বড় UPS কে কমাও
-        max_tag = max(layout, key=layout.get)
-        if layout[max_tag] > 1:
-            layout[max_tag] -= 1
-        else:
-            # যদি সব UPS 1 হয়, তাহলে সবচেয়ে ছোট Tag-কে 0 করো
-            min_tag = min(layout, key=layout.get)
-            if layout[min_tag] > 0:
-                layout[min_tag] -= 1
-            else:
-                break
-
-    while sum(layout.values()) < capacity:
-        best = max(decimal_map, key=decimal_map.get)
-        layout[best] = layout.get(best, 0) + 1
-        decimal_map[best] = 0
-
-    return layout
-
+    # ✅ Use helper function
+    return create_valid_layout(active, capacity, "proportional")
 
 def v4_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     best_score = 999999
@@ -881,7 +903,7 @@ def v4_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 
             layout = proportional_layout_v4(active, capacity)
             
-            # ✅ Check if layout is valid
+            # ✅ Validate layout
             if not layout or sum(layout.values()) != capacity:
                 break
             
@@ -915,50 +937,9 @@ def v4_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 
     return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
-
-# ================================================================
-# V5 - AI Mutation Engine
-# ================================================================
 def generate_layout_v5(active: dict, capacity: int) -> dict:
-    total_qty = sum(active.values())
-    layout, decimal_map = {}, {}
-
-    for tag, qty in active.items():
-        ideal = (qty / total_qty) * capacity
-        base = floor(ideal)
-        if base < 1:
-            base = 1
-        layout[tag] = base
-        decimal_map[tag] = ideal - floor(ideal)
-
-    random_tags = list(active.keys())
-    random.shuffle(random_tags)
-
-    while sum(layout.values()) > capacity:
-        biggest = max(layout, key=layout.get)
-        if layout[biggest] > 1:
-            layout[biggest] -= 1
-        else:
-            break
-
-    while sum(layout.values()) < capacity:
-        best = max(decimal_map, key=decimal_map.get)
-        layout[best] += 1
-        decimal_map[best] = 0
-
-    if len(layout) >= 2:
-        for _ in range(2):
-            a = random.choice(random_tags)
-            b = random.choice(random_tags)
-            if a != b and layout[a] > 1:
-                layout[a] -= 1
-                layout[b] += 1
-                if sum(layout.values()) > capacity:
-                    layout[b] -= 1
-                    layout[a] += 1
-
-    return layout
-
+    # ✅ Use helper function
+    return create_valid_layout(active, capacity, "greedy")
 
 def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
     best_score = 999999
@@ -974,6 +955,11 @@ def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
                 break
 
             layout = generate_layout_v5(active, capacity)
+            
+            # ✅ Validate layout
+            if not layout or sum(layout.values()) != capacity:
+                break
+            
             options = [ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0]
 
             if not options:
@@ -1004,9 +990,6 @@ def v5_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
     return ensure_demand_met(best_plates, demand) if best_plates else v3_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V6 - Integer Solver
-# ================================================================
 def v6_optimizer(demand: dict, capacity: int, max_plates: int) -> list | None:
     if not PULP_AVAILABLE:
         return None
@@ -1022,7 +1005,7 @@ def v6_optimizer(demand: dict, capacity: int, max_plates: int) -> list | None:
 
         try:
             model = LpProblem(f"Plate_{plate_num}", LpMinimize)
-            ups = {t: LpVariable(f"UPS_{t}", lowBound=1, cat="Integer") for t in active_tags}
+            ups = {t: LpVariable(f"UPS_{t}", lowBound=0, cat="Integer") for t in active_tags}
             sheets = LpVariable("Sheets", lowBound=1, cat="Integer")
             excess_vars = [ups[t] * sheets - remaining[t] for t in active_tags]
 
@@ -1036,6 +1019,20 @@ def v6_optimizer(demand: dict, capacity: int, max_plates: int) -> list | None:
 
             if model.status == 1:
                 layout = {t: int(value(ups[t])) for t in active_tags}
+                
+                # ✅ Ensure no zero values if possible
+                for tag in active_tags:
+                    if layout.get(tag, 0) == 0:
+                        layout[tag] = 1
+                
+                # ✅ Fix capacity if needed
+                while sum(layout.values()) > capacity:
+                    max_tag = max(layout, key=layout.get)
+                    if layout[max_tag] > 1:
+                        layout[max_tag] -= 1
+                    else:
+                        break
+                
                 sheet_count = int(value(sheets))
 
                 plates.append({
@@ -1055,9 +1052,6 @@ def v6_optimizer(demand: dict, capacity: int, max_plates: int) -> list | None:
     return ensure_demand_met(plates, demand) if plates else v3_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V7 - Simulated Annealing
-# ================================================================
 def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 150) -> list:
     def calculate_waste(layout: dict, sheets: int, remaining: dict) -> int:
         return sum(max(0, ups * sheets - remaining.get(tag, 0)) for tag, ups in layout.items())
@@ -1108,13 +1102,8 @@ def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
         if not active:
             return {}
         
-        total = sum(active.values())
-        layout = {}
-        
-        for tag, qty in active.items():
-            ideal = (qty / total) * capacity
-            layout[tag] = max(1, int(ideal))
-        
+        # ✅ Use helper function
+        layout = create_valid_layout(active, capacity, "balanced")
         return adjust_to_exact_capacity(layout, capacity)
 
     remaining = demand.copy()
@@ -1169,9 +1158,6 @@ def v7_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
     return ensure_demand_met(plates, demand)
 
 
-# ================================================================
-# V8 - MCTS Tree Search
-# ================================================================
 class MCTSNodeV8:
     def __init__(self, layout: dict, remaining: dict, capacity: int, parent=None):
         self.layout = layout
@@ -1195,7 +1181,6 @@ class MCTSNodeV8:
                 )
             choices.append((ucb, child))
         return max(choices, key=lambda x: x[0])[1]
-
 
 def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
     def adjust_to_exact_capacity(layout: dict, capacity: int, remaining: dict) -> dict:
@@ -1223,9 +1208,8 @@ def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
         if not active:
             return {}
         
-        total = sum(active.values())
-        layout = {tag: max(1, int((qty / total) * capacity)) for tag, qty in active.items()}
-        
+        # ✅ Use helper function
+        layout = create_valid_layout(active, capacity, "balanced")
         return adjust_to_exact_capacity(layout, capacity, active)
 
     remaining = demand.copy()
@@ -1302,10 +1286,6 @@ def v8_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int =
 
 
 
-
-# ================================================================
-# V11 - Genetic Algorithm
-# ================================================================
 def v11_optimizer(demand: dict, capacity: int, max_plates: int, 
                    population_size: int = 30, generations: int = 50, 
                    mutation_rate: float = 0.1, elite_size: int = 5) -> list:
@@ -1321,22 +1301,8 @@ def v11_optimizer(demand: dict, capacity: int, max_plates: int,
             if not active:
                 break
             
-            total = sum(active.values())
-            layout = {}
-            
-            for tag, qty in active.items():
-                layout[tag] = max(1, floor((qty / total) * capacity))
-            
-            while sum(layout.values()) > capacity:
-                biggest = max(layout, key=layout.get)
-                if layout[biggest] > 1:
-                    layout[biggest] -= 1
-                else:
-                    break
-            
-            while sum(layout.values()) < capacity:
-                biggest = max(active, key=active.get)
-                layout[biggest] += 1
+            # ✅ Use helper function
+            layout = create_valid_layout(active, capacity, "greedy")
             
             sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
             
@@ -1373,15 +1339,9 @@ def v11_optimizer(demand: dict, capacity: int, max_plates: int,
             sheets = p.get("sheets", 1)
             layout = p.get("layout", {})
             
+            # ✅ Validate and fix layout
             if sum(layout.values()) != capacity:
-                total = sum(active.values())
-                layout = {tag: max(1, int((qty / total) * capacity)) for tag, qty in active.items()}
-                while sum(layout.values()) > capacity:
-                    max_tag = max(layout, key=layout.get)
-                    if layout[max_tag] > 1:
-                        layout[max_tag] -= 1
-                    else:
-                        break
+                layout = create_valid_layout(active, capacity, "greedy")
             
             new_plates.append({"layout": layout, "sheets": sheets})
             
@@ -1441,9 +1401,6 @@ def v11_optimizer(demand: dict, capacity: int, max_plates: int,
     return ensure_demand_met(population[best_idx], demand)
 
 
-# ================================================================
-# V12 - Column Generation
-# ================================================================
 def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     if not PULP_AVAILABLE:
         return v3_optimizer(demand, capacity, max_plates)
@@ -1486,7 +1443,7 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
             ups = {tag: LpVariable(f"ups_{tag}", lowBound=0, upBound=capacity, cat="Integer") 
                    for tag in tags_list}
             sub += lpSum(duals.get(tag, 0) * ups[tag] for tag in tags_list) - 1
-            sub += lpSum(ups[tag] for tag in tags_list) <= capacity
+            sub += lpSum(ups[tag] for tag in tags_list) == capacity  # ✅ Fixed: == capacity
             sub.solve()
             
             if sub.status == 1:
@@ -1504,22 +1461,8 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         if not active:
             break
         
-        total = sum(active.values())
-        pattern = {}
-        for tag, qty in active.items():
-            pattern[tag] = max(1, int((qty / total) * capacity))
-        
-        while sum(pattern.values()) > capacity:
-            max_tag = max(pattern, key=pattern.get)
-            if pattern[max_tag] > 1:
-                pattern[max_tag] -= 1
-            else:
-                break
-        
-        while sum(pattern.values()) < capacity:
-            max_tag = max(active, key=active.get)
-            pattern[max_tag] = pattern.get(max_tag, 0) + 1
-        
+        # ✅ Use helper function
+        pattern = create_valid_layout(active, capacity, "proportional")
         patterns.append(pattern)
         
         sheets = 1
@@ -1604,11 +1547,8 @@ def v12_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 
 
 
-# ================================================================
-# V15 - Dynamic Programming Repair Engine
-# ================================================================
 def v15_optimizer(demand: dict, capacity: int, max_plates: int):
-    # Use V3 as base instead of V14
+    # ✅ Use V3 as base
     base = v3_optimizer(demand, capacity, max_plates)
 
     if not base:
@@ -1644,10 +1584,6 @@ def v15_optimizer(demand: dict, capacity: int, max_plates: int):
 
     return ensure_demand_met(best, demand)
 
-
-# ================================================================
-# V16 - Plate Merge Optimizer
-# ================================================================
 def v16_optimizer(demand: dict, capacity: int, max_plates: int):
     plates = v15_optimizer(demand, capacity, max_plates)
 
@@ -1673,6 +1609,7 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
             for tag, ups in candidate["layout"].items():
                 combined[tag] = combined.get(tag, 0) + ups
 
+            # ✅ Check capacity
             if sum(combined.values()) <= capacity:
                 current["layout"] = combined
                 current["sheets"] = max(current["sheets"], candidate["sheets"])
@@ -1682,14 +1619,10 @@ def v16_optimizer(demand: dict, capacity: int, max_plates: int):
 
     return ensure_demand_met(merged, demand)
 
-
-# ================================================================
-# V17 - AI Evolution Engine
-# ================================================================
 def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 200):
     population = []
 
-    # Only use available algorithms
+    # ✅ Only use available algorithms
     available_algos = [v3_optimizer, v5_optimizer, v11_optimizer, v15_optimizer, v16_optimizer]
     
     for _ in range(20):
@@ -1738,13 +1671,10 @@ def v17_optimizer(demand: dict, capacity: int, max_plates: int, generations: int
     return ensure_demand_met(best_solution, demand) if best_solution else v3_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V18 - Global Multi-Plate Optimizer
-# ================================================================
 def v18_optimizer(demand: dict, capacity: int, max_plates: int):
     candidates = []
 
-    # Only use available algorithms
+    # ✅ Only use available algorithms
     algos = [v3_optimizer, v5_optimizer, v11_optimizer, v15_optimizer, v16_optimizer, v17_optimizer]
 
     for algo in algos:
@@ -1763,9 +1693,6 @@ def v18_optimizer(demand: dict, capacity: int, max_plates: int):
     return ensure_demand_met(candidates[0][1], demand)
 
 
-# ================================================================
-# V19 - CONSTRAINT PROGRAMMING (CP-SAT) OPTIMIZER
-# ================================================================
 def v19_optimizer(demand: dict, capacity: int, max_plates: int, time_limit_seconds: int = 5) -> list:
     if not ORTOOLS_AVAILABLE:
         return v18_optimizer(demand, capacity, max_plates)
@@ -1834,9 +1761,6 @@ def v19_optimizer(demand: dict, capacity: int, max_plates: int, time_limit_secon
     return v18_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V20 - PARTICLE SWARM OPTIMIZATION (PSO)
-# ================================================================
 def v20_optimizer(demand: dict, capacity: int, max_plates: int, 
                    particles: int = 20, iterations: int = 50) -> list:
     
@@ -1853,21 +1777,16 @@ def v20_optimizer(demand: dict, capacity: int, max_plates: int,
                 if not active:
                     break
                 
-                total = sum(active.values())
-                layout = {}
-                for tag, qty in active.items():
-                    layout[tag] = max(1, int((qty / total) * capacity) + random.randint(-1, 1))
+                # ✅ Use helper function
+                layout = create_valid_layout(active, capacity, "proportional")
                 
-                while sum(layout.values()) > capacity:
-                    max_tag = max(layout, key=layout.get)
-                    if layout[max_tag] > 1:
-                        layout[max_tag] -= 1
-                    else:
-                        break
-                
-                while sum(layout.values()) < capacity:
-                    max_tag = max(active, key=active.get)
-                    layout[max_tag] = layout.get(max_tag, 0) + 1
+                # Add some randomness
+                if len(layout) >= 2:
+                    tags_list = list(layout.keys())
+                    a, b = random.sample(tags_list, 2)
+                    if layout.get(a, 0) > 1:
+                        layout[a] = layout.get(a, 1) - 1
+                        layout[b] = layout.get(b, 0) + 1
                 
                 sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
                 self.plates.append({"layout": layout, "sheets": sheets})
@@ -1910,9 +1829,6 @@ def v20_optimizer(demand: dict, capacity: int, max_plates: int,
     return ensure_demand_met(best_global_plates, demand) if best_global_plates else v18_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V21 - ANT COLONY OPTIMIZATION (ACO) - CORRECTED
-# ================================================================
 def v21_optimizer(demand: dict, capacity: int, max_plates: int,
                    ants: int = 15, iterations: int = 30,
                    alpha: float = 1.0, beta: float = 2.0,
@@ -1941,64 +1857,45 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
             if not active:
                 break
             
-            layout = {}
-            remaining_cap = capacity
+            # ✅ Use helper function as base
+            layout = create_valid_layout(active, capacity, "proportional")
             
-            active_tags = list(active.keys())
-            random.shuffle(active_tags)
-            
-            for tag in active_tags:
-                if remaining_cap <= 0:
-                    break
-                
-                tag_idx = tags.index(tag)
-                max_allowed_ups = min(remaining_cap, active[tag])
-                
-                if max_allowed_ups <= 0:
-                    continue
-                
-                possible_ups = list(range(1, max_allowed_ups + 1))
-                probabilities = []
-                
-                for ups in possible_ups:
-                    tau = pheromone.get((tag_idx, ups), 1.0) ** alpha
-                    eta = (1.0 / ups) ** beta
-                    probabilities.append(tau * eta)
-                
-                if probabilities and sum(probabilities) > 0:
-                    total_prob = sum(probabilities)
-                    probs = [p / total_prob for p in probabilities]
-                    chosen_ups = random.choices(possible_ups, weights=probs)[0]
-                else:
-                    chosen_ups = max(1, min(max_allowed_ups, capacity // len(active_tags) + 1))
-                
-                layout[tag] = chosen_ups
-                remaining_cap -= chosen_ups
+            # ACO optimization on top of base layout
+            remaining_cap = capacity - sum(layout.values())
             
             if remaining_cap > 0 and active:
-                remaining_tags = list(active.keys())
-                while remaining_cap > 0 and remaining_tags:
-                    for tag in remaining_tags:
+                active_tags = list(active.keys())
+                while remaining_cap > 0 and active_tags:
+                    for tag in active_tags:
                         if remaining_cap <= 0:
                             break
-                        layout[tag] = layout.get(tag, 0) + 1
-                        remaining_cap -= 1
+                        tag_idx = tags.index(tag)
+                        # Use pheromone to decide which tag gets extra UPS
+                        ups_options = list(range(1, min(remaining_cap, active[tag]) + 1))
+                        if ups_options:
+                            probabilities = []
+                            for ups in ups_options:
+                                tau = pheromone.get((tag_idx, ups), 1.0) ** alpha
+                                eta = (1.0 / (ups + 1)) ** beta
+                                probabilities.append(tau * eta)
+                            if probabilities and sum(probabilities) > 0:
+                                total_prob = sum(probabilities)
+                                probs = [p / total_prob for p in probabilities]
+                                chosen_ups = random.choices(ups_options, weights=probs)[0]
+                                layout[tag] = layout.get(tag, 0) + chosen_ups
+                                remaining_cap -= chosen_ups
             
-            if not layout:
-                total_active = sum(active.values())
-                for tag, qty in active.items():
-                    layout[tag] = max(1, int((qty / total_active) * capacity))
-                
-                while sum(layout.values()) > capacity:
-                    max_tag = max(layout, key=layout.get)
-                    if layout[max_tag] > 1:
-                        layout[max_tag] -= 1
-                    else:
-                        break
-                
-                while sum(layout.values()) < capacity:
-                    max_tag = max(active, key=active.get)
-                    layout[max_tag] = layout.get(max_tag, 0) + 1
+            # ✅ Ensure exact capacity
+            while sum(layout.values()) > capacity:
+                max_tag = max(layout, key=layout.get)
+                if layout[max_tag] > 1:
+                    layout[max_tag] -= 1
+                else:
+                    break
+            
+            while sum(layout.values()) < capacity:
+                max_tag = max(active, key=active.get)
+                layout[max_tag] = layout.get(max_tag, 0) + 1
             
             sheets_list = []
             for tag, ups in layout.items():
@@ -2060,9 +1957,6 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
     return ensure_demand_met(best_plates, demand) if best_plates else v18_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V22 - Q-LEARNING OPTIMIZER (CORRECTED)
-# ================================================================
 class QLearningPlateOptimizer:
     def __init__(self, demand, capacity, max_plates, learning_rate=0.1, discount=0.9, epsilon=0.1):
         self.demand = demand
@@ -2101,21 +1995,8 @@ class QLearningPlateOptimizer:
                 if not active:
                     break
                 
-                total = sum(active.values())
-                layout = {}
-                for tag, qty in active.items():
-                    layout[tag] = max(1, int((qty / total) * self.capacity))
-                
-                while sum(layout.values()) > self.capacity:
-                    max_tag = max(layout, key=layout.get)
-                    if layout[max_tag] > 1:
-                        layout[max_tag] -= 1
-                    else:
-                        break
-                
-                while sum(layout.values()) < self.capacity:
-                    max_tag = max(active, key=active.get)
-                    layout[max_tag] = layout.get(max_tag, 0) + 1
+                # ✅ Use helper function
+                layout = create_valid_layout(active, self.capacity, "balanced")
                 
                 state = self.get_state_key(remaining, layout)
                 possible_actions = self.get_possible_actions(layout)
@@ -2124,6 +2005,7 @@ class QLearningPlateOptimizer:
                     action = self.get_action(state, possible_actions)
                     new_layout = self.apply_action(layout, action)
                     
+                    # ✅ Ensure exact capacity
                     while sum(new_layout.values()) > self.capacity:
                         max_tag = max(new_layout, key=new_layout.get)
                         if new_layout[max_tag] > 1:
@@ -2183,7 +2065,6 @@ class QLearningPlateOptimizer:
             new_layout[b] = new_layout.get(b, 0) + 1
         return new_layout
 
-
 def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 30) -> list:
     optimizer = QLearningPlateOptimizer(demand, capacity, max_plates)
     result = optimizer.optimize(episodes)
@@ -2192,9 +2073,6 @@ def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 
 
 
 
-# ================================================================
-# V24 - DIFFERENTIAL EVOLUTION OPTIMIZER (CORRECTED)
-# ================================================================
 def v24_optimizer(demand: dict, capacity: int, max_plates: int,
                    population_size: int = 20, generations: int = 50,
                    F: float = 0.8, CR: float = 0.9) -> list:
@@ -2217,35 +2095,18 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
         for i in range(max_plates):
             start_idx = i * (n_tags + 1)
             layout = {}
-            has_positive_ups = False
             
             for j, tag in enumerate(tags):
                 ups = int(vector[start_idx + j] * capacity)
                 if ups > 0:
                     layout[tag] = max(1, min(ups, capacity))
-                    has_positive_ups = True
             
-            if not has_positive_ups:
+            if not layout:
                 continue
             
-            total_ups = sum(layout.values())
-            if total_ups > capacity:
-                scale = capacity / total_ups
-                for tag in layout:
-                    layout[tag] = max(1, int(layout[tag] * scale))
-            
-            while sum(layout.values()) > capacity:
-                max_tag = max(layout, key=layout.get)
-                if layout[max_tag] > 1:
-                    layout[max_tag] -= 1
-                else:
-                    break
-            
-            while sum(layout.values()) < capacity:
-                if not layout:
-                    break
-                max_tag = max(layout, key=layout.get)
-                layout[max_tag] += 1
+            # ✅ Use helper function to fix layout
+            active = {tag: demand.get(tag, 0) for tag in layout.keys()}
+            layout = create_valid_layout(active, capacity, "proportional")
             
             sheets = max(1, int(vector[start_idx + n_tags] * 1000))
             
@@ -2314,10 +2175,6 @@ def v24_optimizer(demand: dict, capacity: int, max_plates: int,
     
     return ensure_demand_met(best_solution, demand)
 
-
-# ================================================================
-# V25 - MULTI-OBJECTIVE PARETO OPTIMIZER
-# ================================================================
 def v25_optimizer(demand: dict, capacity: int, max_plates: int, 
                    population_size: int = 30, generations: int = 50) -> list:
     
@@ -2346,21 +2203,8 @@ def v25_optimizer(demand: dict, capacity: int, max_plates: int,
             if not active:
                 break
             
-            total = sum(active.values())
-            layout = {}
-            for tag, qty in active.items():
-                layout[tag] = max(1, int((qty / total) * capacity))
-            
-            while sum(layout.values()) > capacity:
-                max_tag = max(layout, key=layout.get)
-                if layout[max_tag] > 1:
-                    layout[max_tag] -= 1
-                else:
-                    break
-            
-            while sum(layout.values()) < capacity:
-                max_tag = max(active, key=active.get)
-                layout[max_tag] = layout.get(max_tag, 0) + 1
+            # ✅ Use helper function
+            layout = create_valid_layout(active, capacity, "greedy")
             
             sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
             plates.append({"layout": layout, "sheets": sheets})
@@ -2469,9 +2313,6 @@ def v25_optimizer(demand: dict, capacity: int, max_plates: int,
     return best.plates if best.plates else v18_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# V26 - NEURAL NETWORK PREDICTOR + OPTIMIZER
-# ================================================================
 def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     
     tags = list(demand.keys())
@@ -2504,23 +2345,8 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
             if best_pattern:
                 return best_pattern
             
-            total = sum(active.values())
-            layout = {}
-            for tag, qty in active.items():
-                layout[tag] = max(1, int((qty / total) * capacity))
-            
-            while sum(layout.values()) > capacity:
-                max_tag = max(layout, key=layout.get)
-                if layout[max_tag] > 1:
-                    layout[max_tag] -= 1
-                else:
-                    break
-            
-            while sum(layout.values()) < capacity:
-                max_tag = max(active, key=active.get)
-                layout[max_tag] = layout.get(max_tag, 0) + 1
-            
-            return layout
+            # ✅ Use helper function
+            return create_valid_layout(active, capacity, "balanced")
     
     predictor = SimplePredictor()
     population_size = 20
