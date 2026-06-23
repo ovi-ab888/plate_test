@@ -2787,28 +2787,54 @@ else:
         try:
             df = pd.read_excel(uploaded_file)
             
+            # Remove completely empty rows
+            df = df.dropna(how='all')
+            
             # Auto-detect columns
             if "Item" in df.columns and "Quantity" in df.columns:
                 items = df["Item"].astype(str).tolist()
-                quantities = df["Quantity"].astype(int).tolist()
+                quantities = df["Quantity"].tolist()
             elif len(df.columns) >= 2:
                 # Assume first column = Item, second column = Quantity
                 items = df.iloc[:, 0].astype(str).tolist()
-                quantities = df.iloc[:, 1].astype(int).tolist()
+                quantities = df.iloc[:, 1].tolist()
             else:
                 st.error("❌ Excel file must have at least 2 columns (Item and Quantity)")
                 st.stop()
             
-            # Store in session state for later use
-            st.session_state['uploaded_items'] = items
-            st.session_state['uploaded_qty'] = quantities
+            # Clean data: remove NaN, empty strings, and non-numeric quantities
+            cleaned_data = []
+            for item, qty in zip(items, quantities):
+                # Skip if item is empty or NaN
+                if pd.isna(item) or str(item).strip() == '':
+                    continue
+                
+                # Skip if quantity is NaN or invalid
+                if pd.isna(qty):
+                    continue
+                
+                try:
+                    qty_int = int(float(qty))  # Convert to int (handles decimal numbers too)
+                    if qty_int > 0:  # Only keep positive quantities
+                        cleaned_data.append((str(item).strip(), qty_int))
+                except (ValueError, TypeError):
+                    # Skip if quantity can't be converted to number
+                    continue
+            
+            if not cleaned_data:
+                st.error("❌ No valid data found in the file. Please check the format.")
+                st.stop()
+            
+            # Separate into lists
+            items = [item for item, _ in cleaned_data]
+            quantities = [qty for _, qty in cleaned_data]
             
             # Show preview
             preview_df = pd.DataFrame({
                 "Item": items,
                 "Quantity": quantities
             })
-            st.success(f"✅ File loaded successfully! {len(items)} items found.")
+            st.success(f"✅ File loaded successfully! {len(items)} valid items found.")
             st.dataframe(preview_df, use_container_width=True)
             
             # Auto-set the number of items
@@ -2828,10 +2854,7 @@ else:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Data Preparation
-original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
-demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
-
+# ================== WARNING MESSAGES ==================
 if not PULP_AVAILABLE:
     st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
 
