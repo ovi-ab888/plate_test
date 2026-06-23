@@ -2876,21 +2876,109 @@ st.markdown('</div>', unsafe_allow_html=True)
 if input_mode == "✏️ Manual Input":
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
     
+    # Column headers
+    col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
+    with col1:
+        st.markdown("**SL**")
+    with col2:
+        st.markdown("**Style**")
+    with col3:
+        st.markdown("**Color**")
+    with col4:
+        st.markdown("**Size**")
+    with col5:
+        st.markdown("**Quantity**")
+    
+    st.markdown("---")
+    
     tags = []
+    styles = []
+    colors = []
+    sizes = []
     qty = []
+    
     for i in range(n):
-        col1, col2 = st.columns([1, 3])
+        col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
+        
         with col1:
-            st.markdown(f"<div class='tag-display'>Item {i+1}</div>", unsafe_allow_html=True)
+            st.markdown(f"**{i+1}**")
+        
         with col2:
-            q = st.number_input(f"Quantity", min_value=0, value=0, step=100, key=f"qty_manual_{i}", label_visibility="collapsed")
-        tags.append(f"Item {i+1}")
-        qty.append(q)
+            style_val = st.text_input(
+                "Style", 
+                value="N/A", 
+                key=f"style_{i}",
+                label_visibility="collapsed",
+                placeholder="N/A"
+            )
+        
+        with col3:
+            color_val = st.text_input(
+                "Color", 
+                value="N/A", 
+                key=f"color_{i}",
+                label_visibility="collapsed",
+                placeholder="N/A"
+            )
+        
+        with col4:
+            size_val = st.text_input(
+                "Size", 
+                value="N/A", 
+                key=f"size_{i}",
+                label_visibility="collapsed",
+                placeholder="N/A"
+            )
+        
+        with col5:
+            qty_val = st.number_input(
+                "Quantity", 
+                min_value=0, 
+                value=0, 
+                step=100, 
+                key=f"qty_manual_{i}",
+                label_visibility="collapsed"
+            )
+        
+        # Store values
+        style_display = style_val.strip() if style_val.strip() else "N/A"
+        color_display = color_val.strip() if color_val.strip() else "N/A"
+        size_display = size_val.strip() if size_val.strip() else "N/A"
+        
+        styles.append(style_display)
+        colors.append(color_display)
+        sizes.append(size_display)
+        
+        # Create tag with style info (for display purposes)
+        tag = f"Item {i+1}"
+        if style_display != "N/A":
+            tag = f"{style_display}"
+        
+        tags.append(tag)
+        qty.append(qty_val)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
-    demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
+    # Show preview with all columns
+    if any(q > 0 for q in qty):
+        preview_df = pd.DataFrame({
+            "SL": range(1, n + 1),
+            "Style": styles,
+            "Color": colors,
+            "Size": sizes,
+            "Quantity": qty
+        })
+        st.info("📋 Data Preview (showing all items)")
+        st.dataframe(preview_df, use_container_width=True, height=200)
+    
+    # Data Preparation
+    original_qty = {f"Item {i+1}": int(q) for i, q in enumerate(qty) if q > 0}
+    demand = {f"Item {i+1}": ceil(int(q) * (1 + addon / 100)) for i, q in enumerate(qty) if q > 0}
+    
+    # Store style/color/size info for later use
+    st.session_state['item_styles'] = {f"Item {i+1}": styles[i] for i in range(n)}
+    st.session_state['item_colors'] = {f"Item {i+1}": colors[i] for i in range(n)}
+    st.session_state['item_sizes'] = {f"Item {i+1}": sizes[i] for i in range(n)}
 
 # ================== EXCEL FILE UPLOAD ==================
 else:
