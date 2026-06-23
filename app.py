@@ -3169,88 +3169,113 @@ if generate_clicked:
         </div>
         """, unsafe_allow_html=True)
         
-        # Best Algorithm Report
-        st.markdown("## 📋 Best Algorithm Report")
-        best_plates = results[best_algo]
+# Best Algorithm Report
+st.markdown("## 📋 Best Algorithm Report")
+best_plates = results[best_algo]
+
+if best_plates:
+    try:
+        st.markdown("### 📊 Production Summary")
+        full_df = build_full_summary(best_plates, demand, original_qty)
+        if not full_df.empty:
+            st.dataframe(full_df, use_container_width=True, height=380)
         
-        if best_plates:
-            try:
-                st.markdown("### 📊 Production Summary")
-                full_df = build_full_summary(best_plates, demand, original_qty)
-                if not full_df.empty:
-                    st.dataframe(full_df, use_container_width=True, height=380)
-                
-                st.markdown("### 🧾 Plate Configuration Details")
-                plate_rows = []
-                total_sheets_sum = 0
-                total_ups_sum = 0
-                
-                for idx, p in enumerate(best_plates, 1):
-                    if p and "layout" in p:
-                        total_ups = sum(p["layout"].values())
-                        plate_name_str = p.get("name", f"Plate {idx}")
-                        plate_rows.append({
-                            "SL": idx,
-                            "Plate ID": plate_name_str,
-                            "Sheets Required": p.get("sheets", 0),
-                            "Total UPS": total_ups,
-                        })
-                        total_sheets_sum += p.get("sheets", 0)
-                        total_ups_sum += total_ups
-                
+        st.markdown("### 🧾 Plate Configuration Details")
+        plate_rows = []
+        total_sheets_sum = 0
+        total_ups_sum = 0
+        
+        for idx, p in enumerate(best_plates, 1):
+            if p and "layout" in p:
+                total_ups = sum(p["layout"].values())
+                plate_name_str = p.get("name", f"Plate {idx}")
                 plate_rows.append({
-                    "SL": "📊",
-                    "Plate ID": "TOTAL",
-                    "Sheets Required": total_sheets_sum,
-                    "Total UPS": total_ups_sum,
+                    "SL": idx,
+                    "Plate ID": plate_name_str,
+                    "Sheets Required": p.get("sheets", 0),
+                    "Total UPS": total_ups,
                 })
-                
-                plate_details_df = pd.DataFrame(plate_rows)
-                st.dataframe(plate_details_df, use_container_width=True)
-                
-                # Download buttons
-                st.markdown("### 📥 Download Best Report")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    bio_excel = BytesIO()
-                    with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
-                        full_df.to_excel(writer, sheet_name="Summary", index=False)
-                        plate_details_df.to_excel(writer, sheet_name="Plate Details", index=False)
-                        comparison_df.to_excel(writer, sheet_name="Comparison", index=False)
-                    bio_excel.seek(0)
-                    st.download_button(
-                        "📊 Download Excel", 
-                        bio_excel,
-                        f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                        use_container_width=True
+                total_sheets_sum += p.get("sheets", 0)
+                total_ups_sum += total_ups
+        
+        plate_rows.append({
+            "SL": "📊",
+            "Plate ID": "TOTAL",
+            "Sheets Required": total_sheets_sum,
+            "Total UPS": total_ups_sum,
+        })
+        
+        plate_details_df = pd.DataFrame(plate_rows)
+        st.dataframe(plate_details_df, use_container_width=True)
+        
+        # ============= DOWNLOAD BUTTONS =============
+        st.markdown("### 📥 Download Best Report")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            bio_excel = BytesIO()
+            with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
+                full_df.to_excel(writer, sheet_name="Summary", index=False)
+                plate_details_df.to_excel(writer, sheet_name="Plate Details", index=False)
+                comparison_df.to_excel(writer, sheet_name="Comparison", index=False)
+            bio_excel.seek(0)
+            st.download_button(
+                "📊 Download Excel", 
+                bio_excel,
+                f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                use_container_width=True
+            )
+        
+        with col2:
+            # Always show PDF download button
+            if REPORTLAB_AVAILABLE:
+                try:
+                    # Get style/color/size data from session state
+                    styles_dict = st.session_state.get('item_styles', {})
+                    colors_dict = st.session_state.get('item_colors', {})
+                    sizes_dict = st.session_state.get('item_sizes', {})
+                    
+                    pdf_buffer = generate_pdf_report(
+                        best_plates, 
+                        demand, 
+                        original_qty, 
+                        best_algo, 
+                        best_waste,
+                        styles_dict, 
+                        colors_dict, 
+                        sizes_dict
                     )
-                
-                with col2:
-                    if REPORTLAB_AVAILABLE:
-                        pdf_buffer = generate_pdf_report(best_plates, demand, original_qty, best_algo, best_waste)
-                        if pdf_buffer:
-                            st.download_button(
-                                "📄 Download PDF", 
-                                pdf_buffer,
-                                f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                                mime="application/pdf", 
-                                use_container_width=True
-                            )
-            except Exception as e:
-                st.error(f"Error generating report: {str(e)}")
-                st.info("Showing comparison table instead...")
+                    
+                    if pdf_buffer:
+                        st.download_button(
+                            "📄 Download PDF", 
+                            pdf_buffer,
+                            f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                            mime="application/pdf", 
+                            use_container_width=True
+                        )
+                    else:
+                        st.warning("⚠️ PDF generation failed. Please check reportlab installation.")
+                except Exception as e:
+                    st.error(f"❌ PDF Error: {str(e)}")
+            else:
+                st.warning("⚠️ ReportLab not installed. Install with: pip install reportlab")
         
-        # Algorithm Comparison
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        styled_df = comparison_df.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row) 
-            if row["Algorithm"] == best_algo else [''] * len(row), axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=600)
+    except Exception as e:
+        st.error(f"Error generating report: {str(e)}")
+        st.info("Showing comparison table instead...")
+
+# Algorithm Comparison
+st.markdown("---")
+st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
+
+styled_df = comparison_df.style.apply(
+    lambda row: ['background-color: #2e7d32; color: white'] * len(row) 
+    if row["Algorithm"] == best_algo else [''] * len(row), axis=1
+).format({"Waste %": "{:.2f}%"})
+
+st.dataframe(styled_df, use_container_width=True, height=600)
+
 
 # ====================== VIEW ANY ALGORITHM REPORT ======================
 st.markdown("---")
