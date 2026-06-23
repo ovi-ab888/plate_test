@@ -3236,24 +3236,30 @@ if best_plates:
         plate_details_df = pd.DataFrame(plate_rows)
         st.dataframe(plate_details_df, use_container_width=True)
         
-        # ============= DOWNLOAD BUTTONS =============
-        st.markdown("### 📥 Download Best Report")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            bio_excel = BytesIO()
-            with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
-                full_df.to_excel(writer, sheet_name="Summary", index=False)
-                plate_details_df.to_excel(writer, sheet_name="Plate Details", index=False)
-                comparison_df.to_excel(writer, sheet_name="Comparison", index=False)
-            bio_excel.seek(0)
-            st.download_button(
-                "📊 Download Excel", 
-                bio_excel,
-                f"BEST_{best_algo.replace(' ','_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                use_container_width=True
-            )
-        
+# ============= DOWNLOAD BUTTONS =============
+st.markdown("### 📥 Download Best Report")
+col1, col2 = st.columns(2)
+
+with col1:
+    bio_excel = BytesIO()
+    with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
+        full_df.to_excel(writer, sheet_name="Summary", index=False)
+        plate_details_df.to_excel(writer, sheet_name="Plate Details", index=False)
+        comparison_df.to_excel(writer, sheet_name="Comparison", index=False)
+    bio_excel.seek(0)
+    
+    # Clean job number for Excel filename
+    job_number = st.session_state.get('job_number', 'JOB-00000')
+    clean_job = ''.join(c for c in job_number if c.isalnum() or c == '-')
+    excel_filename = f"{clean_job}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    
+    st.download_button(
+        "📊 Download Excel",
+        bio_excel,
+        excel_filename,
+        use_container_width=True
+    )
+
 with col2:
     # Check if reportlab is available
     try:
@@ -3271,28 +3277,27 @@ with col2:
             job_number = st.session_state.get('job_number', 'JOB-00000')
             
             pdf_buffer = generate_pdf_report(
-                best_plates, 
-                demand, 
-                original_qty, 
-                best_algo, 
+                best_plates,
+                demand,
+                original_qty,
+                best_algo,
                 best_waste,
-                styles_dict, 
-                colors_dict, 
+                styles_dict,
+                colors_dict,
                 sizes_dict,
                 job_number
             )
             
             if pdf_buffer:
-                # Create filename with job number
-                # Clean job number for filename (remove special characters)
+                # Clean job number for filename
                 clean_job = ''.join(c for c in job_number if c.isalnum() or c == '-')
-                filename = f"{clean_job}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                pdf_filename = f"{clean_job}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
                 
                 st.download_button(
-                    "📄 Download PDF", 
+                    "📄 Download PDF",
                     pdf_buffer,
-                    filename,
-                    mime="application/pdf", 
+                    pdf_filename,
+                    mime="application/pdf",
                     use_container_width=True
                 )
             else:
@@ -3302,13 +3307,14 @@ with col2:
     else:
         st.info("ℹ️ PDF download requires reportlab. Install with: pip install reportlab")
 
-# Algorithm Comparison
+# ============= ALGORITHM COMPARISON =============
 st.markdown("---")
 st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
 
 styled_df = comparison_df.style.apply(
-    lambda row: ['background-color: #2e7d32; color: white'] * len(row) 
-    if row["Algorithm"] == best_algo else [''] * len(row), axis=1
+    lambda row: ['background-color: #2e7d32; color: white'] * len(row)
+    if row["Algorithm"] == best_algo else [''] * len(row),
+    axis=1
 ).format({"Waste %": "{:.2f}%"})
 
 st.dataframe(styled_df, use_container_width=True, height=600)
