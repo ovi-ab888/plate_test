@@ -3236,11 +3236,11 @@ if best_plates:
         plate_details_df = pd.DataFrame(plate_rows)
         st.dataframe(plate_details_df, use_container_width=True)
         
-# Best Algorithm Report
-st.markdown("## 📋 Best Algorithm Report")
-best_plates = results[best_algo]
+ # Best Algorithm Report
+ st.markdown("## 📋 Best Algorithm Report")
+ best_plates = results[best_algo]
 
-if best_plates:
+ if best_plates:
     try:
         st.markdown("### 📊 Production Summary")
         full_df = build_full_summary(best_plates, demand, original_qty)
