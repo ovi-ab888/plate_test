@@ -452,8 +452,14 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
                         algo_name: str, waste_percent: float,
                         styles_dict: dict = None, colors_dict: dict = None, 
                         sizes_dict: dict = None) -> BytesIO | None:
-    """Generate professional PDF report with all columns"""
-    if not REPORTLAB_AVAILABLE:
+    """Generate professional PDF report with Style, Color, Size columns"""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+    except ImportError:
         return None
 
     # Initialize empty dicts if not provided
@@ -627,6 +633,8 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         return buffer
 
     except Exception as e:
+        # Print error for debugging
+        print(f"PDF Generation Error: {str(e)}")
         return None
 
 
