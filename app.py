@@ -2741,19 +2741,90 @@ with col4:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ================== ITEM QUANTITY ==================
-st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details</div>', unsafe_allow_html=True)
+# ================== INPUT MODE SELECTION ==================
+st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Input Method</div>', unsafe_allow_html=True)
 
-tags = []
-qty = []
-for i in range(n):
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        st.markdown(f"<div class='tag-display'>Item {i+1}</div>", unsafe_allow_html=True)
-    with col2:
-        q = st.number_input(f"Quantity", min_value=0, value=0, step=100, key=f"qty_{i}", label_visibility="collapsed")
-    tags.append(f"Item {i+1}")
-    qty.append(q)
+input_mode = st.radio(
+    "Select Input Mode:",
+    options=["✏️ Manual Input", "📂 Upload Excel File"],
+    horizontal=True,
+    index=0
+)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ================== MANUAL INPUT ==================
+if input_mode == "✏️ Manual Input":
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
+    
+    tags = []
+    qty = []
+    for i in range(n):
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.markdown(f"<div class='tag-display'>Item {i+1}</div>", unsafe_allow_html=True)
+        with col2:
+            q = st.number_input(f"Quantity", min_value=0, value=0, step=100, key=f"qty_manual_{i}", label_visibility="collapsed")
+        tags.append(f"Item {i+1}")
+        qty.append(q)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
+    demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
+
+# ================== EXCEL FILE UPLOAD ==================
+else:
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
+    
+    uploaded_file = st.file_uploader(
+        "Upload Excel file with Item Names and Quantities",
+        type=["xlsx", "xls"],
+        help="File must have two columns: 'Item' and 'Quantity'"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            df = pd.read_excel(uploaded_file)
+            
+            # Auto-detect columns
+            if "Item" in df.columns and "Quantity" in df.columns:
+                items = df["Item"].astype(str).tolist()
+                quantities = df["Quantity"].astype(int).tolist()
+            elif len(df.columns) >= 2:
+                # Assume first column = Item, second column = Quantity
+                items = df.iloc[:, 0].astype(str).tolist()
+                quantities = df.iloc[:, 1].astype(int).tolist()
+            else:
+                st.error("❌ Excel file must have at least 2 columns (Item and Quantity)")
+                st.stop()
+            
+            # Store in session state for later use
+            st.session_state['uploaded_items'] = items
+            st.session_state['uploaded_qty'] = quantities
+            
+            # Show preview
+            preview_df = pd.DataFrame({
+                "Item": items,
+                "Quantity": quantities
+            })
+            st.success(f"✅ File loaded successfully! {len(items)} items found.")
+            st.dataframe(preview_df, use_container_width=True)
+            
+            # Auto-set the number of items
+            n = len(items)
+            tags = items
+            qty = quantities
+            
+            original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
+            demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
+            
+        except Exception as e:
+            st.error(f"❌ Error reading file: {str(e)}")
+            st.stop()
+    else:
+        st.info("📤 Please upload an Excel file to continue.")
+        st.stop()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
