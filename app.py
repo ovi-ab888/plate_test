@@ -3197,46 +3197,7 @@ if generate_clicked:
         </div>
         """, unsafe_allow_html=True)
         
-# Best Algorithm Report
-st.markdown("## 📋 Best Algorithm Report")
-best_plates = results[best_algo]
-
-if best_plates:
-    try:
-        st.markdown("### 📊 Production Summary")
-        full_df = build_full_summary(best_plates, demand, original_qty)
-        if not full_df.empty:
-            st.dataframe(full_df, use_container_width=True, height=380)
-        
-        st.markdown("### 🧾 Plate Configuration Details")
-        plate_rows = []
-        total_sheets_sum = 0
-        total_ups_sum = 0
-        
-        for idx, p in enumerate(best_plates, 1):
-            if p and "layout" in p:
-                total_ups = sum(p["layout"].values())
-                plate_name_str = p.get("name", f"Plate {idx}")
-                plate_rows.append({
-                    "SL": idx,
-                    "Plate ID": plate_name_str,
-                    "Sheets Required": p.get("sheets", 0),
-                    "Total UPS": total_ups,
-                })
-                total_sheets_sum += p.get("sheets", 0)
-                total_ups_sum += total_ups
-        
-        plate_rows.append({
-            "SL": "📊",
-            "Plate ID": "TOTAL",
-            "Sheets Required": total_sheets_sum,
-            "Total UPS": total_ups_sum,
-        })
-        
-        plate_details_df = pd.DataFrame(plate_rows)
-        st.dataframe(plate_details_df, use_container_width=True)
-        
-        # Best Algorithm Report
+        # ============= BEST ALGORITHM REPORT =============
         st.markdown("## 📋 Best Algorithm Report")
         best_plates = results[best_algo]
         
@@ -3362,71 +3323,74 @@ if best_plates:
         
         st.dataframe(styled_df, use_container_width=True, height=600)
 
-# ====================== VIEW ANY ALGORITHM REPORT ======================
-st.markdown("---")
-st.markdown("## 🔍 View Individual Algorithm Report")
+        # ============= VIEW ANY ALGORITHM REPORT =============
+        st.markdown("---")
+        st.markdown("## 🔍 View Individual Algorithm Report")
 
-if 'results' in st.session_state and st.session_state['results']:
-    algo_list = list(st.session_state['results'].keys())
-    
-    default_index = 0
-    if st.session_state.get('best_algo') in algo_list:
-        default_index = algo_list.index(st.session_state['best_algo'])
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        selected_algo = st.selectbox(
-            "Select Algorithm to View Report:",
-            options=algo_list,
-            index=default_index,
-            key="independent_algo_selector"
-        )
-
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        view_button = st.button("📋 View Report", use_container_width=True, type="primary")
-
-    if view_button:
-        selected_plates = st.session_state['results'].get(selected_algo)
-        
-        if selected_plates:
-            st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
+        if 'results' in st.session_state and st.session_state['results']:
+            algo_list = list(st.session_state['results'].keys())
             
-            full_df = build_full_summary(selected_plates, 
-                                       st.session_state['demand'], 
-                                       st.session_state['original_qty'])
-            st.dataframe(full_df, use_container_width=True, height=400)
+            default_index = 0
+            if st.session_state.get('best_algo') in algo_list:
+                default_index = algo_list.index(st.session_state['best_algo'])
 
-            st.markdown("### 🧾 Plate Configuration Details")
-            plate_rows = []
-            total_sheets = 0
-            total_ups = 0
-            for idx, p in enumerate(selected_plates, 1):
-                ups_sum = sum(p["layout"].values())
-                plate_rows.append({
-                    "SL": idx,
-                    "Plate ID": p.get("name", f"Plate {idx}"),
-                    "Sheets Required": p.get("sheets", 0),
-                    "Total UPS": ups_sum,
-                })
-                total_sheets += p.get("sheets", 0)
-                total_ups += ups_sum
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                selected_algo = st.selectbox(
+                    "Select Algorithm to View Report:",
+                    options=algo_list,
+                    index=default_index,
+                    key="independent_algo_selector"
+                )
 
-            plate_rows.append({
-                "SL": "📊",
-                "Plate ID": "TOTAL",
-                "Sheets Required": total_sheets,
-                "Total UPS": total_ups,
-            })
+            with col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                view_button = st.button("📋 View Report", use_container_width=True, type="primary")
 
-            plate_df = pd.DataFrame(plate_rows)
-            st.dataframe(plate_df, use_container_width=True)
+            if view_button:
+                selected_plates = st.session_state['results'].get(selected_algo)
+                
+                if selected_plates:
+                    st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
+                    
+                    full_df = build_full_summary(
+                        selected_plates, 
+                        st.session_state['demand'], 
+                        st.session_state['original_qty']
+                    )
+                    st.dataframe(full_df, use_container_width=True, height=400)
 
-            waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
-            st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+                    st.markdown("### 🧾 Plate Configuration Details")
+                    plate_rows = []
+                    total_sheets = 0
+                    total_ups = 0
+                    
+                    for idx, p in enumerate(selected_plates, 1):
+                        ups_sum = sum(p["layout"].values())
+                        plate_rows.append({
+                            "SL": idx,
+                            "Plate ID": p.get("name", f"Plate {idx}"),
+                            "Sheets Required": p.get("sheets", 0),
+                            "Total UPS": ups_sum,
+                        })
+                        total_sheets += p.get("sheets", 0)
+                        total_ups += ups_sum
 
-        else:
-            st.error(f"❌ Report not found for {selected_algo}")
+                    plate_rows.append({
+                        "SL": "📊",
+                        "Plate ID": "TOTAL",
+                        "Sheets Required": total_sheets,
+                        "Total UPS": total_ups,
+                    })
+
+                    plate_df = pd.DataFrame(plate_rows)
+                    st.dataframe(plate_df, use_container_width=True)
+
+                    waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
+                    st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+
+                else:
+                    st.error(f"❌ Report not found for {selected_algo}")
 
 # Footer
 st.markdown("""
