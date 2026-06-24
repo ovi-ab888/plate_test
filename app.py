@@ -3004,7 +3004,7 @@ if generate_clicked:
                             if pdf_buffer:
                                 # Clean job number for filename
                                 clean_job = ''.join(c for c in job_number if c.isalnum() or c == '-')
-                                pdf_filename = f"{clean_job}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+                                pdf_filename = f"Job_Number_{clean_job}.pdf"
                                 
                                 st.download_button(
                                     "📄 Download PDF",
