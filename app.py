@@ -2372,6 +2372,98 @@ def v26_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     return ensure_demand_met(population[best_idx], demand) if population else v18_optimizer(demand, capacity, max_plates)
 
 
+
+
+def v27_optimizer(demand: dict, capacity: int, max_plates: int, 
+                   learning_rate: float = 0.01, iterations: int = 100) -> list:
+    """
+    V27 - Gradient Descent Optimizer
+    Uses gradient descent to minimize waste by adjusting UPS distribution
+    """
+    tags = list(demand.keys())
+    n_tags = len(tags)
+    
+    def loss_function(layout):
+        """Calculate loss (waste) for current layout"""
+        total_ups = sum(layout.values())
+        if total_ups == 0:
+            return float('inf')
+        
+        # Calculate waste based on demand vs production
+        waste = 0
+        for tag in tags:
+            produced = layout.get(tag, 0)
+            if produced > 0:
+                sheets = ceil(demand[tag] / produced)
+                waste += (produced * sheets - demand[tag])
+        return waste
+    
+    def gradient(layout):
+        """Calculate gradient for each tag"""
+        grad = {}
+        current_loss = loss_function(layout)
+        
+        for tag in tags:
+            # Small perturbation
+            perturbed = layout.copy()
+            perturbed[tag] = perturbed.get(tag, 0) + 1
+            
+            # Fix capacity
+            if sum(perturbed.values()) > capacity:
+                continue
+            
+            new_loss = loss_function(perturbed)
+            grad[tag] = (new_loss - current_loss) / 1.0
+        
+        return grad
+    
+    # Initial solution
+    current = create_valid_layout(demand, capacity, "balanced")
+    best = current.copy()
+    best_waste = loss_function(current)
+    
+    for iteration in range(iterations):
+        # Calculate gradient
+        grad = gradient(current)
+        
+        # Update layout using gradient descent
+        for tag in grad:
+            if grad[tag] < 0:  # Only move in negative gradient direction
+                current[tag] = current.get(tag, 0) + 1
+        
+        # Ensure capacity
+        current = create_valid_layout(current, capacity, "proportional")
+        
+        # Check if improved
+        current_waste = loss_function(current)
+        if current_waste < best_waste:
+            best = current.copy()
+            best_waste = current_waste
+    
+    # Convert to plates
+    plates = []
+    remaining = demand.copy()
+    
+    for p in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        layout = best.copy()
+        sheets = max(1, min(ceil(remaining[tag] / layout.get(tag, 1)) for tag in active))
+        
+        plates.append({
+            "name": plate_name(p + 1),
+            "layout": layout,
+            "sheets": sheets
+        })
+        
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+    
+    return ensure_demand_met(plates, demand)
+
+
 # ================================================================
 # MAIN UI
 # ================================================================
@@ -2734,6 +2826,7 @@ if generate_clicked:
             "V22 - Q-Learning Optimizer": lambda: v22_optimizer(demand, cap, maxp, episodes=20),
             "V24 - Differential Evolution": lambda: v24_optimizer(demand, cap, maxp, population_size=15, generations=30),
             "V25 - Pareto Optimizer": lambda: v25_optimizer(demand, cap, maxp, population_size=20, generations=30),
+            "V27 - Gradient Descent": lambda: v27_optimizer(demand, cap, maxp),
             "V26 - NN Predictor": lambda: v26_optimizer(demand, cap, maxp),
         }
         
