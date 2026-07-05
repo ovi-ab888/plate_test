@@ -57,7 +57,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-
+# ================================================================
+# PASSWORD FUNCTION
+# ================================================================
+def check_password():
+    """Password protection function"""
+    
     # Password Page Styling
     st.markdown("""
     <style>
@@ -152,7 +157,6 @@ st.set_page_config(
         st.error("❌ Incorrect password. Please contact Mr. Ovi.")
 
     return False
-
 
 # ================== APP START ==================
 if not check_password():
