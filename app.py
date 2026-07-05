@@ -1945,11 +1945,12 @@ def v21_optimizer(demand: dict, capacity: int, max_plates: int,
     return ensure_demand_met(best_plates, demand) if best_plates else v18_optimizer(demand, capacity, max_plates)
 
 
+
 class QLearningPlateOptimizer:
     def __init__(self, demand, capacity, max_plates, learning_rate=0.1, discount=0.9, epsilon=0.1):
         self.demand = demand
         self.capacity = capacity
-        self.max_plates = max_plates
+        self.max_plates = max_plates  # ✅ স্টোর করুন
         self.lr = learning_rate
         self.discount = discount
         self.epsilon = epsilon
@@ -1970,71 +1971,6 @@ class QLearningPlateOptimizer:
         best_actions = [a for a, q in zip(possible_actions, q_values) if q == max_q]
         return random.choice(best_actions) if best_actions else random.choice(possible_actions)
     
-    def optimize(self, episodes=30):
-        best_plates = None
-        best_waste = float('inf')
-        
-        for episode in range(episodes):
-            remaining = self.demand.copy()
-            plates = []
-            
-            for plate_num in range(self.max_plates):
-                active = {k: v for k, v in remaining.items() if v > 0}
-                if not active:
-                    break
-                
-                # ✅ Use helper function
-                layout = create_valid_layout(active, self.capacity, "balanced")
-                
-                state = self.get_state_key(remaining, layout)
-                possible_actions = self.get_possible_actions(layout)
-                
-                if possible_actions and len(plates) < self.max_plates - 1:
-                    action = self.get_action(state, possible_actions)
-                    new_layout = self.apply_action(layout, action)
-                    
-                    # ✅ Ensure exact capacity
-                    while sum(new_layout.values()) > self.capacity:
-                        max_tag = max(new_layout, key=new_layout.get)
-                        if new_layout[max_tag] > 1:
-                            new_layout[max_tag] -= 1
-                        else:
-                            break
-                    
-                    while sum(new_layout.values()) < self.capacity:
-                        max_tag = max(active, key=active.get)
-                        new_layout[max_tag] = new_layout.get(max_tag, 0) + 1
-                    
-                    new_sheets = max(1, min(ceil(remaining[t] / new_layout.get(t, 1)) for t in active))
-                    waste = sum(max(0, new_layout.get(t, 0) * new_sheets - remaining.get(t, 0)) for t in active)
-                    reward = -waste
-                    
-                    next_state = self.get_state_key(remaining, new_layout)
-                    old_q = self.q_table.get((state, action), 0)
-                    next_actions = self.get_possible_actions(new_layout)
-                    next_max_q = max([self.q_table.get((next_state, a), 0) for a in next_actions]) if next_actions else 0
-                    new_q = old_q + self.lr * (reward + self.discount * next_max_q - old_q)
-                    self.q_table[(state, action)] = new_q
-                    
-                    layout = new_layout
-            
-            sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active))
-            plates.append({"name": plate_name(len(plates) + 1), "layout": layout, "sheets": sheets})
-            
-            for tag, ups in layout.items():
-                remaining[tag] = max(0, remaining[tag] - (ups * sheets))
-            
-            plates = ensure_demand_met(plates, self.demand)
-            waste = calculate_waste_percent(plates, self.demand)
-            
-            if waste < best_waste:
-                best_waste = waste
-                best_plates = copy.deepcopy(plates)
-            
-            self.epsilon *= 0.99
-        
-        return ensure_demand_met(best_plates, self.demand) if best_plates else v3_optimizer(self.demand, self.capacity, self.max_plates)
-    
     def get_possible_actions(self, layout):
         actions = []
         tags_list = list(layout.keys())
@@ -2052,8 +1988,89 @@ class QLearningPlateOptimizer:
             new_layout[a] -= 1
             new_layout[b] = new_layout.get(b, 0) + 1
         return new_layout
+    
+    def optimize(self, episodes=30):
+        best_plates = None
+        best_waste = float('inf')
+        
+        for episode in range(episodes):
+            remaining = self.demand.copy()
+            plates = []
+            plate_count = 0  # ✅ প্লেট কাউন্টার
+            
+            # ✅ max_plates পর্যন্ত লুপ চালান
+            while plate_count < self.max_plates:
+                active = {k: v for k, v in remaining.items() if v > 0}
+                if not active:
+                    break
+                
+                # ✅ হেল্পার ফাংশন ব্যবহার করুন
+                layout = create_valid_layout(active, self.capacity, "balanced")
+                
+                # ✅ শুধুমাত্র যদি প্লেট সংখ্যা max_plates এর কম হয় তাহলে মিউটেশন করুন
+                if plate_count < self.max_plates - 1:
+                    state = self.get_state_key(remaining, layout)
+                    possible_actions = self.get_possible_actions(layout)
+                    
+                    if possible_actions:
+                        action = self.get_action(state, possible_actions)
+                        new_layout = self.apply_action(layout, action)
+                        
+                        # ✅ এক্সাক্ট ক্যাপাসিটি নিশ্চিত করুন
+                        while sum(new_layout.values()) > self.capacity:
+                            max_tag = max(new_layout, key=new_layout.get)
+                            if new_layout[max_tag] > 1:
+                                new_layout[max_tag] -= 1
+                            else:
+                                break
+                        
+                        while sum(new_layout.values()) < self.capacity:
+                            max_tag = max(active, key=active.get)
+                            new_layout[max_tag] = new_layout.get(max_tag, 0) + 1
+                        
+                        # ✅ রিওয়ার্ড ক্যালকুলেট করুন
+                        sheets = max(1, min(ceil(remaining[t] / new_layout.get(t, 1)) for t in active))
+                        waste = sum(max(0, new_layout.get(t, 0) * sheets - remaining.get(t, 0)) for t in active)
+                        reward = -waste
+                        
+                        next_state = self.get_state_key(remaining, new_layout)
+                        old_q = self.q_table.get((state, action), 0)
+                        next_actions = self.get_possible_actions(new_layout)
+                        next_max_q = max([self.q_table.get((next_state, a), 0) for a in next_actions]) if next_actions else 0
+                        new_q = old_q + self.lr * (reward + self.discount * next_max_q - old_q)
+                        self.q_table[(state, action)] = new_q
+                        
+                        layout = new_layout
+                
+                # ✅ শীট ক্যালকুলেট করুন
+                sheets = max(1, min(ceil(remaining[t] / layout.get(t, 1)) for t in active))
+                plates.append({
+                    "name": plate_name(len(plates) + 1), 
+                    "layout": layout, 
+                    "sheets": sheets
+                })
+                
+                # ✅ রিমেইনিং আপডেট করুন
+                for tag, ups in layout.items():
+                    remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+                
+                plate_count += 1  # ✅ প্লেট কাউন্ট বাড়ান
+            
+            # ✅ ডিমান্ড মেট করা নিশ্চিত করুন
+            plates = ensure_demand_met(plates, self.demand)
+            waste = calculate_waste_percent(plates, self.demand)
+            
+            if waste < best_waste:
+                best_waste = waste
+                best_plates = copy.deepcopy(plates)
+            
+            self.epsilon *= 0.99
+        
+        return ensure_demand_met(best_plates, self.demand) if best_plates else v3_optimizer(self.demand, self.capacity, self.max_plates)
+
 
 def v22_optimizer(demand: dict, capacity: int, max_plates: int, episodes: int = 30) -> list:
+    """V22 - Q-Learning Optimizer (Fixed max_plates)"""
     optimizer = QLearningPlateOptimizer(demand, capacity, max_plates)
     result = optimizer.optimize(episodes)
     return ensure_demand_met(result, demand) if result else v3_optimizer(demand, capacity, max_plates)
