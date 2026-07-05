@@ -2939,74 +2939,127 @@ if generate_clicked:
         
         st.dataframe(styled_df, use_container_width=True, height=600)
 
-        # ============= VIEW ANY ALGORITHM REPORT =============
-        st.markdown("---")
-        st.markdown("## 🔍 View Individual Algorithm Report")
+# ============= VIEW ANY ALGORITHM REPORT =============
+st.markdown("---")
+st.markdown("## 🔍 View Individual Algorithm Report")
 
-        if 'results' in st.session_state and st.session_state['results']:
-            algo_list = list(st.session_state['results'].keys())
+if 'results' in st.session_state and st.session_state['results']:
+    algo_list = list(st.session_state['results'].keys())
+    
+    default_index = 0
+    if st.session_state.get('best_algo') in algo_list:
+        default_index = algo_list.index(st.session_state['best_algo'])
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        selected_algo = st.selectbox(
+            "Select Algorithm to View Report:",
+            options=algo_list,
+            index=default_index,
+            key="independent_algo_selector"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        view_button = st.button("📋 View Report", use_container_width=True, type="primary")
+    
+    if view_button:
+        selected_plates = st.session_state['results'].get(selected_algo)
+        
+        if selected_plates:
+            st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
             
-            default_index = 0
-            if st.session_state.get('best_algo') in algo_list:
-                default_index = algo_list.index(st.session_state['best_algo'])
-
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                selected_algo = st.selectbox(
-                    "Select Algorithm to View Report:",
-                    options=algo_list,
-                    index=default_index,
-                    key="independent_algo_selector"
-                )
-
-            with col2:
-                st.markdown("<br>", unsafe_allow_html=True)
-                view_button = st.button("📋 View Report", use_container_width=True, type="primary")
-
-            if view_button:
-                selected_plates = st.session_state['results'].get(selected_algo)
-                
-                if selected_plates:
-                    st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
+            full_df = build_full_summary(
+                selected_plates, 
+                st.session_state['demand'], 
+                st.session_state['original_qty']
+            )
+            st.dataframe(full_df, use_container_width=True, height=400)
+            
+            st.markdown("### 🧾 Plate Configuration Details")
+            plate_rows = []
+            total_sheets = 0
+            total_ups = 0
+            
+            for idx, p in enumerate(selected_plates, 1):
+                ups_sum = sum(p["layout"].values())
+                plate_rows.append({
+                    "SL": idx,
+                    "Plate ID": p.get("name", f"Plate {idx}"),
+                    "Sheets Required": p.get("sheets", 0),
+                    "Total UPS": ups_sum,
+                })
+                total_sheets += p.get("sheets", 0)
+                total_ups += ups_sum
+            
+            plate_rows.append({
+                "SL": "📊",
+                "Plate ID": "TOTAL",
+                "Sheets Required": total_sheets,
+                "Total UPS": total_ups,
+            })
+            
+            plate_df = pd.DataFrame(plate_rows)
+            st.dataframe(plate_df, use_container_width=True)
+            
+            waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
+            st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+            
+            # ✅ ডাউনলোড অপশন
+            st.markdown("### 📥 Download Report")
+            col_d1, col_d2 = st.columns(2)
+            
+            with col_d1:
+                try:
+                    bio_excel = BytesIO()
+                    with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
+                        full_df.to_excel(writer, sheet_name="Summary", index=False)
+                        plate_df.to_excel(writer, sheet_name="Plate Details", index=False)
+                    bio_excel.seek(0)
                     
-                    full_df = build_full_summary(
-                        selected_plates, 
-                        st.session_state['demand'], 
-                        st.session_state['original_qty']
+                    st.download_button(
+                        "📊 Download Excel",
+                        bio_excel,
+                        f"{selected_algo}_report.xlsx",
+                        use_container_width=True
                     )
-                    st.dataframe(full_df, use_container_width=True, height=400)
-
-                    st.markdown("### 🧾 Plate Configuration Details")
-                    plate_rows = []
-                    total_sheets = 0
-                    total_ups = 0
-                    
-                    for idx, p in enumerate(selected_plates, 1):
-                        ups_sum = sum(p["layout"].values())
-                        plate_rows.append({
-                            "SL": idx,
-                            "Plate ID": p.get("name", f"Plate {idx}"),
-                            "Sheets Required": p.get("sheets", 0),
-                            "Total UPS": ups_sum,
-                        })
-                        total_sheets += p.get("sheets", 0)
-                        total_ups += ups_sum
-
-                    plate_rows.append({
-                        "SL": "📊",
-                        "Plate ID": "TOTAL",
-                        "Sheets Required": total_sheets,
-                        "Total UPS": total_ups,
-                    })
-
-                    plate_df = pd.DataFrame(plate_rows)
-                    st.dataframe(plate_df, use_container_width=True)
-
-                    waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
-                    st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
-
-                else:
-                    st.error(f"❌ Report not found for {selected_algo}")
+                except Exception as e:
+                    st.error(f"Excel export error: {str(e)}")
+            
+            with col_d2:
+                if REPORTLAB_AVAILABLE:
+                    try:
+                        styles_dict = st.session_state.get('item_styles', {})
+                        colors_dict = st.session_state.get('item_colors', {})
+                        sizes_dict = st.session_state.get('item_sizes', {})
+                        job_number = st.session_state.get('job_number', 'JOB-00000')
+                        
+                        pdf_buffer = generate_pdf_report(
+                            selected_plates,
+                            st.session_state['demand'],
+                            st.session_state['original_qty'],
+                            selected_algo,
+                            waste,
+                            styles_dict,
+                            colors_dict,
+                            sizes_dict,
+                            job_number
+                        )
+                        
+                        if pdf_buffer:
+                            st.download_button(
+                                "📄 Download PDF",
+                                pdf_buffer,
+                                f"{selected_algo}_report.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                    except Exception as e:
+                        st.warning(f"PDF not available: {str(e)}")
+        else:
+            st.error(f"❌ Report not found for {selected_algo}")
+else:
+    st.info("ℹ️ Please generate the optimization first to view individual algorithm reports.")
 
 # Footer
 st.markdown("""
