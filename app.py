@@ -58,37 +58,6 @@ st.set_page_config(
 )
 
 
-# ================================================================
-# PASSWORD AUTHENTICATION
-# ================================================================
-def check_password():
-    expected = None
-    try:
-        expected = st.secrets.get("app_password", None)
-    except Exception:
-        pass
-    
-    if expected is None:
-        expected = os.environ.get("PEPCO_APP_PASSWORD")
-    
-    if expected is None:
-        st.error("App password not configured.")
-        return False
-
-    def _password_entered():
-        if st.session_state.get("password") == expected:
-            st.session_state["password_correct"] = True
-            try:
-                del st.session_state["password"]
-            except Exception:
-                pass
-        else:
-            st.session_state["password_correct"] = False
-            st.session_state["wrong_password"] = True
-
-    if st.session_state.get("password_correct", None) is True:
-        return True
-
     # Password Page Styling
     st.markdown("""
     <style>
