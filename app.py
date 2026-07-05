@@ -58,129 +58,30 @@ st.set_page_config(
 )
 
 # ================================================================
-# PASSWORD FUNCTION
-# ================================================================
-def check_password():
-    """Password protection function"""
-    
-    # Password Page Styling
-    st.markdown("""
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { font-family: 'Inter', sans-serif; }
-        .stApp {
-            background: linear-gradient(-45deg, #0f0c29, #1a1a3e, #24243e, #1a1a3e);
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
-        }
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-        .main > div { background: transparent !important; padding: 0 !important; }
-        .block-container { padding: 0rem !important; max-width: 90% !important; }
-        .main-header {
-            background: linear-gradient(135deg, rgba(102,126,234,0.15) 0%, rgba(118,75,162,0.15) 100%);
-            backdrop-filter: blur(10px);
-            padding: 2rem;
-            border-radius: 30px;
-            margin: 1rem 1rem 0rem 1rem;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        .main-header h1 {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin: 0;
-        }
-        .password-container {
-            max-width: 460px;
-            margin: 40px auto 8px auto;
-            padding: 2.8rem 2rem 1.8rem 2rem;
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(20px);
-            border-radius: 32px;
-            text-align: center;
-            border: 1px solid rgba(255,255,255,0.1);
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
-        }
-        .lock-icon { font-size: 3rem; margin: 1rem 0; animation: bounce 2s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        .stTextInput { margin-top: -10px !important; }
-        .stTextInput input {
-            background: rgba(255,255,255,0.08) !important;
-            border: 1px solid rgba(255,255,255,0.2) !important;
-            border-radius: 30px !important;
-            color: white !important;
-            text-align: center !important;
-            font-size: 1.1rem !important;
-            padding: 0.9rem 1.5rem !important;
-            letter-spacing: 3px;
-        }
-        #MainMenu, header, footer {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="main-header">
-        <h1>Plate Ratio System</h1>
-        <p>Intelligent Production Planning & Ratio Optimization</p>
-        <p style="font-size: 0.85rem; opacity: 0.8;">AI-Powered • Fast • Accurate</p>
-        <p class="designer-name">✨ Design by Ovi ✨</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="password-container">
-        <h2>Welcome Back</h2>
-        <div class="lock-icon">🔐</div>
-        <p>Enter your secure access code to continue</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1.4, 1.1, 1.4])
-    with col2:
-        st.text_input(
-            label="",
-            type="password",
-            key="password",
-            on_change=_password_entered,
-            label_visibility="collapsed",
-            placeholder="••••••••"
-        )
-
-    if st.session_state.get("password_correct") is False:
-        st.error("❌ Incorrect password. Please contact Mr. Ovi.")
-
-    return False
-
-# ================== APP START ==================
-if not check_password():
-    st.stop()
-
-st.success("✅ Successfully logged in!")
-
-
-# ================================================================
 # MODERN CSS FOR MAIN APP
 # ================================================================
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     * { font-family: 'Inter', sans-serif; }
-    .stApp { background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #24243e 100%); }
+    .stApp { 
+        background: linear-gradient(135deg, #0f0c29 0%, #1a1a3e 50%, #24243e 100%);
+        background-size: 400% 400%;
+        animation: gradientShift 15s ease infinite;
+    }
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
     .main-header {
         background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);
         backdrop-filter: blur(10px);
-        border-bottom: 1px solid rgba(255,255,255,0.1);
         padding: 2rem 2rem;
         margin-bottom: 2rem;
         text-align: center;
-        border-radius: 0;
+        border-radius: 30px;
+        border: 1px solid rgba(255,255,255,0.1);
     }
     .main-header h1 {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -191,6 +92,14 @@ st.markdown("""
         margin: 0;
     }
     .main-header p { color: rgba(255,255,255,0.7); margin-top: 0.5rem; }
+    .designer-name {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
     .card {
         background: rgba(255,255,255,0.05);
         backdrop-filter: blur(10px);
@@ -265,24 +174,28 @@ st.markdown("""
         background: rgba(255,255,255,0.12) !important;
     }
     .stDataFrame { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 0.5rem; }
-    .tag-display {
-        background: linear-gradient(135deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%);
-        padding: 10px;
-        border-radius: 12px;
-        border: 1px solid rgba(102,126,234,0.3);
-        color: #667eea;
-        font-weight: 600;
-        text-align: center;
-        font-size: 0.9rem;
-    }
     .warning { background: rgba(255,193,7,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #ffc107; color: #ffc107; margin: 1rem 0; }
     .info { background: rgba(23,162,184,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #17a2b8; color: #17a2b8; }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; }
+    #MainMenu, header, footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
+# ================================================================
+# HEADER
+# ================================================================
+st.markdown("""
+<div class="main-header">
+    <h1>📊 Plate Ratio Intelligence System</h1>
+    <p>Complete Edition • 26 Algorithms • Production Ready</p>
+    <p style="font-size: 0.85rem; opacity: 0.6;">AI-Powered • Fast • Accurate</p>
+    <div class="designer-name">✨ Design by Ovi ✨</div>
+</div>
+""", unsafe_allow_html=True)
+
+# ================================================================
+# REST OF YOUR APP CODE HERE
+# ================================================================
+# ... আপনার বাকি কোড ...
 
 # ================================================================
 # HELPER FUNCTIONS
