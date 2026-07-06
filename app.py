@@ -496,144 +496,127 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 # ================================================================
 # V27 ALGORITHM IMPLEMENTATION (🎨 MAX PLATES ENFORCED)
 # ================================================================
-def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60, max_plates=10):
+def v27_optimized(demand_dict, plate_capacity=60, max_plates=10, iterations=50):
     """
-    Algorithm V27: Dynamic Step-Down Balance Optimization (Multi-Scenario)
-    Inspired & Designed by Ovi's Manual Excel Workflow.
-    Strictly enforces max_plates constraints on the final run.
+    V27 - Optimized Version
+    Inspired by Ovi's Manual Excel Workflow
     """
-    TOTAL_UPS = plate_capacity
-    scaling_factors = [0.80, 0.90, 1.00, 1.10, 1.20]
-    best_result = None
-    min_total_waste = float('inf')
     
-    for factor in scaling_factors:
-        current_demand = copy.deepcopy(demand_dict)
-        plates_list = []
-        run_count = 1
+    def calculate_waste(plates, demand):
+        total_produced = 0
+        total_demand = sum(demand.values())
         
-        total_initial_demand = sum(current_demand.values())
-        if total_initial_demand == 0:
-            continue
-        estimated_sheets = total_initial_demand / TOTAL_UPS
-        initial_target_sheets = max(1, int(round(estimated_sheets * factor)))
+        for plate in plates:
+            for tag, ups in plate["layout"].items():
+                total_produced += ups * plate["sheets"]
         
-        is_first_run = True
+        if total_produced == 0:
+            return 100.0
         
-        while sum(current_demand.values()) > 0 and run_count <= max_plates:
-            active_sizes = {k: v for k, v in current_demand.items() if v > 0}
-            if not active_sizes:
+        waste = total_produced - total_demand
+        return (waste / total_produced) * 100
+    
+    def create_layout(remaining, capacity):
+        """Smart UPS Distribution"""
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            return {}
+        
+        total_active = sum(active.values())
+        layout = {}
+        used = 0
+        
+        # Proportional distribution
+        for tag, qty in sorted(active.items(), key=lambda x: x[1], reverse=True):
+            if used >= capacity:
+                break
+            ups = max(1, int((qty / total_active) * capacity))
+            ups = min(ups, capacity - used)
+            if ups > 0:
+                layout[tag] = ups
+                used += ups
+        
+        # Fill remaining
+        while used < capacity and active:
+            best = max(active, key=lambda t: remaining[t] / (layout.get(t, 1) + 1))
+            layout[best] = layout.get(best, 0) + 1
+            used += 1
+        
+        return layout
+    
+    def simulate_with_sheets(sheets):
+        """Simulate one scenario with given sheets"""
+        remaining = demand_dict.copy()
+        plates = []
+        plate_count = 0
+        
+        while plate_count < max_plates and any(v > 0 for v in remaining.values()):
+            # Create layout
+            layout = create_layout(remaining, plate_capacity)
+            if not layout:
                 break
             
-            # If it is the last allowed plate, ensure ALL active sizes are allocated at least 1 UP if possible
-            if run_count == max_plates:
-                allocated_ups = {}
-                if len(active_sizes) <= TOTAL_UPS:
-                    for size in active_sizes:
-                        allocated_ups[size] = 1
-                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
-                    if remaining_ups > 0:
-                        sorted_sizes = sorted(active_sizes.items(), key=lambda x: x[1], reverse=True)
-                        for size, _ in sorted_sizes:
-                            if remaining_ups == 0:
-                                break
-                            allocated_ups[size] += 1
-                            remaining_ups -= 1
-                else:
-                    total_active_demand = sum(active_sizes.values())
-                    allocated_ups = {size: int(floor((qty / total_active_demand) * TOTAL_UPS)) for size, qty in active_sizes.items()}
-                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
-                    if remaining_ups > 0:
-                        sorted_by_remainder = sorted(active_sizes.items(), key=lambda x: (x[1]/total_active_demand * TOTAL_UPS) - floor((x[1]/total_active_demand) * TOTAL_UPS), reverse=True)
-                        for size, _ in sorted_by_remainder:
-                            if remaining_ups == 0:
-                                break
-                            allocated_ups[size] += 1
-                            remaining_ups -= 1
+            # Calculate sheets for this plate
+            if plate_count == max_plates - 1:  # Last plate
+                needed = []
+                for tag, ups in layout.items():
+                    if ups > 0 and remaining.get(tag, 0) > 0:
+                        needed.append(ceil(remaining[tag] / ups))
+                current_sheets = max(needed) if needed else sheets
             else:
-                total_active_demand = sum(active_sizes.values())
-                raw_ups = {}
-                for size, qty in active_sizes.items():
-                    raw_ups[size] = (qty / total_active_demand) * TOTAL_UPS
-                
-                allocated_ups = {size: max(1, int(floor(val))) for size, val in raw_ups.items()}
-                
-                remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
-                if remaining_ups > 0:
-                    sorted_by_remainder = sorted(raw_ups.items(), key=lambda x: x[1] - allocated_ups[x[0]], reverse=True)
-                    for size, _ in sorted_by_remainder:
-                        if remaining_ups == 0:
-                            break
-                        allocated_ups[size] += 1
-                        remaining_ups -= 1
-                
-                if sum(allocated_ups.values()) > TOTAL_UPS:
-                    sorted_by_ups = sorted(allocated_ups.items(), key=lambda x: x[1], reverse=True)
-                    for size, _ in sorted_by_ups:
-                        if sum(allocated_ups.values()) == TOTAL_UPS:
-                            break
-                        if allocated_ups[size] > 1:
-                            allocated_ups[size] -= 1
-
-            # Determine run sheets
-            if is_first_run:
-                run_sheets = initial_target_sheets
-                is_first_run = False
-                if run_count == max_plates:
-                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
-                    if needed_sheets:
-                        run_sheets = max(run_sheets, max(needed_sheets))
-            else:
-                if run_count == max_plates:
-                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
-                    run_sheets = max(needed_sheets) if needed_sheets else 1
-                else:
-                    min_sheet_needed = float('inf')
-                    for size, qty in active_sizes.items():
-                        ups = allocated_ups.get(size, 1)
-                        needed = int(ceil(qty / ups))
-                        if needed < min_sheet_needed:
-                            min_sheet_needed = needed
-                    run_sheets = max(1, min_sheet_needed)
+                current_sheets = sheets
             
-            plate_production = {}
-            for size, ups in allocated_ups.items():
-                plate_production[size] = ups * run_sheets
-                current_demand[size] = max(0, current_demand[size] - plate_production[size])
+            # Apply layout
+            for tag, ups in layout.items():
+                remaining[tag] = max(0, remaining[tag] - (ups * current_sheets))
             
-            plates_list.append({
-                "plate_index": run_count,
-                "name": plate_name(run_count),
-                "layout": allocated_ups,
-                "sheets": run_sheets,
-                "production": plate_production
+            plates.append({
+                "name": plate_name(plate_count + 1),
+                "layout": layout,
+                "sheets": current_sheets
             })
             
-            run_count += 1
-            
-        total_produced = {size: 0 for size in demand_dict.keys()}
-        for p in plates_list:
-            for size, qty in p["production"].items():
-                total_produced[size] += qty
-                
-        scenario_waste = 0
-        for size, target in demand_dict.items():
-            produced = total_produced.get(size, 0)
-            excess = produced - target
-            if excess > 0:
-                scenario_waste += excess
-                
-        if scenario_waste < min_total_waste:
-            min_total_waste = scenario_waste
-            best_result = {
-                "plates": plates_list,
-                "waste": scenario_waste,
-                "produced": total_produced,
-                "factor_percentage": f"{int(factor * 100)}%"
-            }
-            
-    return best_result
-
+            plate_count += 1
+        
+        return plates
+    
+    # ================================================================
+    # MAIN LOGIC
+    # ================================================================
+    
+    total_qty = sum(demand_dict.values())
+    capacity_per_round = max_plates * plate_capacity
+    estimated_sheets = ceil(total_qty / capacity_per_round)
+    
+    # Generate candidate sheets
+    candidate_sheets = []
+    for i in range(-iterations//2, iterations//2 + 1):
+        candidate = estimated_sheets + i
+        if candidate >= 1:
+            candidate_sheets.append(candidate)
+    candidate_sheets = sorted(set(candidate_sheets))
+    
+    # Test each candidate
+    best_plates = None
+    best_waste = float('inf')
+    best_sheets = None
+    
+    for sheets in candidate_sheets:
+        plates = simulate_with_sheets(sheets)
+        if plates:
+            waste = calculate_waste(plates, demand_dict)
+            if waste < best_waste:
+                best_waste = waste
+                best_plates = plates
+                best_sheets = sheets
+    
+    return {
+        "plates": ensure_demand_met(best_plates, demand_dict),
+        "waste_percent": best_waste,
+        "sheets_used": best_sheets,
+        "total_plates": len(best_plates) if best_plates else 0,
+        "candidates_tested": len(candidate_sheets)
+    }
 
 # ================== CONFIGURATION ==================
 st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">⚙️ Production Configuration</div>', unsafe_allow_html=True)
