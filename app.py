@@ -192,14 +192,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ================================================================
-# REST OF YOUR APP CODE HERE
-# ================================================================
-# ... আপনার বাকি কোড ...
 
-# ================================================================
-# HELPER FUNCTIONS
-# ================================================================
+
 # ================================================================
 # UNIVERSAL LAYOUT GENERATOR (FIXED FOR ALL ALGORITHMS)
 # ================================================================
@@ -661,39 +655,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         return None
 
 
-def smart_layout_v1(demand: dict, cap: int) -> dict:
-    total = sum(demand.values())
-    if total == 0:
-        return {}
 
-    # ✅ Use helper function
-    layout = create_valid_layout(demand, cap, "balanced")
-    
-    # Ensure no zero values
-    for k in layout:
-        if layout[k] == 0:
-            layout[k] = 1
-
-    remainders = {}
-    for k, v in demand.items():
-        ratio = (v / total) * cap
-        remainders[k] = ratio - int(ratio)
-
-    while sum(layout.values()) > cap:
-        biggest = max(layout, key=layout.get)
-        if layout[biggest] > 1:
-            layout[biggest] -= 1
-        else:
-            break
-
-    remaining_cap = cap - sum(layout.values())
-    while remaining_cap > 0:
-        best = max(remainders, key=remainders.get)
-        layout[best] = layout.get(best, 0) + 1
-        remainders[best] = 0
-        remaining_cap -= 1
-
-    return layout
 
 
 
