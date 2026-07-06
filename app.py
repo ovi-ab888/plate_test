@@ -1,5 +1,5 @@
 # app.py — COMPLETE PLATE RATIO SYSTEM (V27 ONLY SPECIAL EDITION)
-# Design by Ovi
+# Design by Ovi • Max Plates Enforced & Excel Row Skip Fixed
 
 import os
 import copy
@@ -237,10 +237,11 @@ def ensure_demand_met(plates: list, demand: dict) -> list:
                 additional_sheets = ceil(shortfall / max(1, ups))
                 last_plate["sheets"] += additional_sheets
     
-    # Ensure all plates have names
-    for idx, plate in enumerate(plates):
-        if "name" not in plate:
-            plate["name"] = plate_name(idx + 1)
+    # Recalculate production dictionaries after sheet adjustment
+    for p in plates:
+        p["production"] = {tag: ups * p["sheets"] for tag, ups in p["layout"].items()}
+        if "name" not in p:
+            p["name"] = plate_name(p["plate_index"])
     
     return plates
 
@@ -493,12 +494,13 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 
 
 # ================================================================
-# V27 ALGORITHM IMPLEMENTATION
+# V27 ALGORITHM IMPLEMENTATION (🎨 MAX PLATES ENFORCED)
 # ================================================================
-def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60):
+def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60, max_plates=10):
     """
     Algorithm V27: Dynamic Step-Down Balance Optimization (Multi-Scenario)
     Inspired & Designed by Ovi's Manual Excel Workflow.
+    Strictly enforces max_plates constraints on the final run.
     """
     TOTAL_UPS = plate_capacity
     scaling_factors = [0.80, 0.90, 1.00, 1.10, 1.20]
@@ -518,46 +520,81 @@ def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60):
         
         is_first_run = True
         
-        while sum(current_demand.values()) > 0 and run_count <= 25:
+        while sum(current_demand.values()) > 0 and run_count <= max_plates:
             active_sizes = {k: v for k, v in current_demand.items() if v > 0}
             if not active_sizes:
                 break
+            
+            # If it is the last allowed plate, ensure ALL active sizes are allocated at least 1 UP if possible
+            if run_count == max_plates:
+                allocated_ups = {}
+                if len(active_sizes) <= TOTAL_UPS:
+                    for size in active_sizes:
+                        allocated_ups[size] = 1
+                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                    if remaining_ups > 0:
+                        sorted_sizes = sorted(active_sizes.items(), key=lambda x: x[1], reverse=True)
+                        for size, _ in sorted_sizes:
+                            if remaining_ups == 0:
+                                break
+                            allocated_ups[size] += 1
+                            remaining_ups -= 1
+                else:
+                    total_active_demand = sum(active_sizes.values())
+                    allocated_ups = {size: int(floor((qty / total_active_demand) * TOTAL_UPS)) for size, qty in active_sizes.items()}
+                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                    if remaining_ups > 0:
+                        sorted_by_remainder = sorted(active_sizes.items(), key=lambda x: (x[1]/total_active_demand * TOTAL_UPS) - floor((x[1]/total_active_demand) * TOTAL_UPS), reverse=True)
+                        for size, _ in sorted_by_remainder:
+                            if remaining_ups == 0:
+                                break
+                            allocated_ups[size] += 1
+                            remaining_ups -= 1
+            else:
+                total_active_demand = sum(active_sizes.values())
+                raw_ups = {}
+                for size, qty in active_sizes.items():
+                    raw_ups[size] = (qty / total_active_demand) * TOTAL_UPS
                 
-            total_active_demand = sum(active_sizes.values())
-            raw_ups = {}
-            for size, qty in active_sizes.items():
-                raw_ups[size] = (qty / total_active_demand) * TOTAL_UPS
-            
-            allocated_ups = {size: max(1, int(floor(val))) for size, val in raw_ups.items()}
-            
-            remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
-            if remaining_ups > 0:
-                sorted_by_remainder = sorted(raw_ups.items(), key=lambda x: x[1] - allocated_ups[x[0]], reverse=True)
-                for size, _ in sorted_by_remainder:
-                    if remaining_ups == 0:
-                        break
-                    allocated_ups[size] += 1
-                    remaining_ups -= 1
-            
-            if sum(allocated_ups.values()) > TOTAL_UPS:
-                sorted_by_ups = sorted(allocated_ups.items(), key=lambda x: x[1], reverse=True)
-                for size, _ in sorted_by_ups:
-                    if sum(allocated_ups.values()) == TOTAL_UPS:
-                        break
-                    if allocated_ups[size] > 1:
-                        allocated_ups[size] -= 1
-            
+                allocated_ups = {size: max(1, int(floor(val))) for size, val in raw_ups.items()}
+                
+                remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                if remaining_ups > 0:
+                    sorted_by_remainder = sorted(raw_ups.items(), key=lambda x: x[1] - allocated_ups[x[0]], reverse=True)
+                    for size, _ in sorted_by_remainder:
+                        if remaining_ups == 0:
+                            break
+                        allocated_ups[size] += 1
+                        remaining_ups -= 1
+                
+                if sum(allocated_ups.values()) > TOTAL_UPS:
+                    sorted_by_ups = sorted(allocated_ups.items(), key=lambda x: x[1], reverse=True)
+                    for size, _ in sorted_by_ups:
+                        if sum(allocated_ups.values()) == TOTAL_UPS:
+                            break
+                        if allocated_ups[size] > 1:
+                            allocated_ups[size] -= 1
+
+            # Determine run sheets
             if is_first_run:
                 run_sheets = initial_target_sheets
                 is_first_run = False
+                if run_count == max_plates:
+                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
+                    if needed_sheets:
+                        run_sheets = max(run_sheets, max(needed_sheets))
             else:
-                min_sheet_needed = float('inf')
-                for size, qty in active_sizes.items():
-                    ups = allocated_ups.get(size, 1)
-                    needed = int(ceil(qty / ups))
-                    if needed < min_sheet_needed:
-                        min_sheet_needed = needed
-                run_sheets = max(1, min_sheet_needed)
+                if run_count == max_plates:
+                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
+                    run_sheets = max(needed_sheets) if needed_sheets else 1
+                else:
+                    min_sheet_needed = float('inf')
+                    for size, qty in active_sizes.items():
+                        ups = allocated_ups.get(size, 1)
+                        needed = int(ceil(qty / ups))
+                        if needed < min_sheet_needed:
+                            min_sheet_needed = needed
+                    run_sheets = max(1, min_sheet_needed)
             
             plate_production = {}
             for size, ups in allocated_ups.items():
@@ -607,7 +644,7 @@ with col1:
 with col2:
     cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 60)
 with col3:
-    maxp = st.number_input("🎨 Max Plates", 1, 50, 10)
+    maxp = st.number_input("🎨 Max Plates", 1, 50, 3) # Default value updated to 3 as requested
 with col4:
     addon = st.number_input("📈 Add-on (%)", 0.0, 50.0, 0.0, step=0.5)
 with col5:
@@ -698,16 +735,17 @@ else:
     
     if uploaded_file:
         try:
-            df_xl = pd.read_excel(uploaded_file)
+            # Dynamic Row skipping fixed to start after row 29 metadata
+            df_xl = pd.read_excel(uploaded_file, skiprows=29)
             st.success("Excel File Loaded Successfully!")
             st.dataframe(df_xl.head(), use_container_width=True)
             
             columns_list = list(df_xl.columns)
             col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-            with col_c1: style_col = st.selectbox("Select Style Column", columns_list, index=0)
-            with col_c2: color_col = st.selectbox("Select Color Column", columns_list, index=min(1, len(columns_list)-1))
-            with col_c3: size_col = st.selectbox("Select Size Column", columns_list, index=min(2, len(columns_list)-1))
-            with col_c4: qty_col = st.selectbox("Select Quantity Column", columns_list, index=min(3, len(columns_list)-1))
+            with col_c1: style_col = st.selectbox("Select Style Column", columns_list, index=0 if "Style" not in columns_list else columns_list.index("Style"))
+            with col_c2: color_col = st.selectbox("Select Color Column", columns_list, index=min(1, len(columns_list)-1) if "Color" not in columns_list else columns_list.index("Color"))
+            with col_c3: size_col = st.selectbox("Select Size Column", columns_list, index=min(2, len(columns_list)-1) if "Size" not in columns_list else columns_list.index("Size"))
+            with col_c4: qty_col = st.selectbox("Select Quantity Column", columns_list, index=min(3, len(columns_list)-1) if "Quantity" not in columns_list else columns_list.index("Quantity"))
             
             for index, row in df_xl.iterrows():
                 st_val = str(row[style_col]).strip() if style_col in df_xl.columns else "N/A"
@@ -736,7 +774,7 @@ if tags and sum(qty) > 0:
     
     if st.button("🚀 Calculate V27 Optimal Ratios", type="primary"):
         with st.spinner("Executing Algorithm V27 Simulation..."):
-            algo_res = algo_v27_dynamic_step_down_optimization(demand_dict, cap)
+            algo_res = algo_v27_dynamic_step_down_optimization(demand_dict, cap, int(maxp))
             
             if algo_res and algo_res["plates"]:
                 final_plates = ensure_demand_met(algo_res["plates"], demand_dict)
@@ -761,7 +799,7 @@ if st.session_state.get('calculated', False):
     
     c_m1, c_m2, c_m3 = st.columns(3)
     with c_m1:
-        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(plates)}</div><div class="metric-label">Total Plates Generated</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(plates)}</div><div class="metric-label">Total Plates Generated (Max Bounded)</div></div>', unsafe_allow_html=True)
     with c_m2:
         st.markdown(f'<div class="metric-card"><div class="metric-value">{w_percent}%</div><div class="metric-label">Total Material Waste</div></div>', unsafe_allow_html=True)
     with c_m3:
