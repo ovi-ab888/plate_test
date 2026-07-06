@@ -541,79 +541,104 @@ if "✏️ Manual Input Matrix" in input_mode:
         demand_dict[tag] = int(qty_val * (1 + addon / 100))
     st.markdown('</div>', unsafe_allow_html=True)
 else:
+   # ================================================================
+# EXCEL UPLOAD - COMPLETE FIXED
+# ================================================================
+else:
     st.markdown('<div class="card"><div class="card-title">📂 Upload Industrial Production Matrix</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload .xlsx Spreadsheet Matrix", type=["xlsx"])
+    
     if uploaded_file:
         try:
-            # Read Excel - skip first 29 rows (metadata)
-            df_xl = pd.read_excel(uploaded_file, skiprows=29)
+            # ✅ সরাসরি ফাইল পড়ুন - skiprows নেই
+            df_xl = pd.read_excel(uploaded_file)
+            
+            # ✅ খালি রো বাদ দিন
+            df_xl = df_xl.dropna(how='all')
+            
             st.success("✅ Production Matrix Extracted Successfully!")
+            
+            # 🔍 ডেটা প্রিভিউ দেখান
             st.dataframe(df_xl.head(10), use_container_width=True)
             
+            # ✅ কলাম ডিটেক্ট করুন
             columns_list = list(df_xl.columns)
             
-            # Column mapping
-            col_map1, col_map2, col_map3, col_map4 = st.columns(4)
+            # ✅ স্মার্ট কলাম ডিটেকশন
+            style_col = None
+            color_col = None
+            size_col = None
+            qty_col = None
             
-            # Auto-detect or let user select
-            default_style = 0
-            default_color = 1 if len(columns_list) > 1 else 0
-            default_size = 2 if len(columns_list) > 2 else 0
-            default_qty = 3 if len(columns_list) > 3 else 0
-            
-            # Try to find columns by name
-            for idx, col in enumerate(columns_list):
+            for col in columns_list:
                 col_lower = str(col).lower().strip()
                 if 'style' in col_lower or 'product' in col_lower:
-                    default_style = idx
+                    style_col = col
                 elif 'color' in col_lower or 'colour' in col_lower:
-                    default_color = idx
+                    color_col = col
                 elif 'size' in col_lower:
-                    default_size = idx
+                    size_col = col
                 elif 'qty' in col_lower or 'quantity' in col_lower or 'total' in col_lower:
-                    default_qty = idx
+                    qty_col = col
             
-            style_col = col_map1.selectbox("🎨 Style Column", columns_list, index=default_style)
-            color_col = col_map2.selectbox("🌈 Color Column", columns_list, index=default_color)
-            size_col = col_map3.selectbox("📏 Size Column", columns_list, index=default_size)
-            qty_col = col_map4.selectbox("📊 Quantity Column", columns_list, index=default_qty)
+            # ✅ যদি কোনো কলাম ডিটেক্ট না হয়, তাহলে ইউজারকে সিলেক্ট করতে দিন
+            if not style_col or not color_col or not size_col or not qty_col:
+                st.info("🔍 Please map the correct columns from your Excel file:")
+                
+                col_map1, col_map2, col_map3, col_map4 = st.columns(4)
+                
+                style_col = col_map1.selectbox("🎨 Style Column", columns_list, 
+                                              index=columns_list.index(style_col) if style_col in columns_list else 0)
+                color_col = col_map2.selectbox("🌈 Color Column", columns_list,
+                                               index=columns_list.index(color_col) if color_col in columns_list else min(1, len(columns_list)-1))
+                size_col = col_map3.selectbox("📏 Size Column", columns_list,
+                                              index=columns_list.index(size_col) if size_col in columns_list else min(2, len(columns_list)-1))
+                qty_col = col_map4.selectbox("📊 Quantity Column", columns_list,
+                                             index=columns_list.index(qty_col) if qty_col in columns_list else min(3, len(columns_list)-1))
             
-            # Process each row
+            # ✅ ডেটা প্রসেস করুন
+            items_loaded = 0
             for index, row in df_xl.iterrows():
-                # Get values
-                st_val = str(row.get(style_col, 'N/A')).strip() if pd.notnull(row.get(style_col)) else "N/A"
-                cl_val = str(row.get(color_col, 'N/A')).strip() if pd.notnull(row.get(color_col)) else "N/A"
-                sz_val = str(row.get(size_col, 'N/A')).strip() if pd.notnull(row.get(size_col)) else "N/A"
+                # Check if row has valid data
+                if row.isnull().all():
+                    continue
+                
+                # Get values safely
+                style_val = str(row.get(style_col, '')).strip() if pd.notnull(row.get(style_col)) else ''
+                color_val = str(row.get(color_col, '')).strip() if pd.notnull(row.get(color_col)) else ''
+                size_val = str(row.get(size_col, '')).strip() if pd.notnull(row.get(size_col)) else ''
                 
                 # Quantity with safe conversion
                 qty_raw = row.get(qty_col, 0)
-                if pd.isnull(qty_raw):
-                    q_val = 0
-                else:
-                    try:
-                        q_val = int(float(qty_raw))
-                    except (ValueError, TypeError):
-                        q_val = 0
+                if pd.isnull(qty_raw) or qty_raw == '':
+                    continue
+                
+                try:
+                    q_val = int(float(qty_raw))
+                except (ValueError, TypeError):
+                    continue
                 
                 if q_val > 0:
-                    # Create unique tag
-                    tag = f"Item_{index+1}_{st_val}_{sz_val}"
+                    tag = f"Item_{index+1}_{style_val}_{size_val}"
                     tags.append(tag)
-                    styles_dict[tag] = st_val if st_val else "N/A"
-                    colors_dict[tag] = cl_val if cl_val else "N/A"
-                    sizes_dict[tag] = sz_val if sz_val else "N/A"
+                    styles_dict[tag] = style_val if style_val else "N/A"
+                    colors_dict[tag] = color_val if color_val else "N/A"
+                    sizes_dict[tag] = size_val if size_val else "N/A"
                     original_qty[tag] = q_val
                     demand_dict[tag] = int(q_val * (1 + addon / 100))
+                    items_loaded += 1
             
-            if tags:
-                st.success(f"✅ Loaded {len(tags)} items from Excel!")
+            if items_loaded > 0:
+                st.success(f"✅ Successfully loaded {items_loaded} items from Excel!")
                 st.info(f"📋 Columns mapped: Style='{style_col}', Color='{color_col}', Size='{size_col}', Quantity='{qty_col}'")
             else:
-                st.warning("⚠️ No valid data found. Please check column mappings.")
+                st.warning("⚠️ No valid data found. Please check your Excel file format.")
+                st.info("💡 Expected format: Columns with headers like 'Style', 'Color', 'Size', 'Quantity'")
                 
         except Exception as e:
             st.error(f"❌ Error parsing Excel: {str(e)}")
-            st.info("💡 Tip: Make sure your Excel has columns: Style, Color, Size, Quantity")
+            st.info("💡 Make sure your Excel file has columns: Style, Color, Size, Quantity")
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 
