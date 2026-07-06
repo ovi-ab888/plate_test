@@ -520,12 +520,19 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ================================================================
 # INPUT METHOD ROUTING
 # ================================================================
-input_mode = st.radio("Choose Preferred Input Pipeline:", options=["✏️ Manual Input Matrix", "📂 Automated Excel Pipeline (.xlsx)"], horizontal=True)
+input_mode = st.radio(
+    "Choose Preferred Input Pipeline:", 
+    options=["✏️ Manual Input Matrix", "📂 Automated Excel Pipeline (.xlsx)"], 
+    horizontal=True
+)
 
 styles_dict, colors_dict, sizes_dict, original_qty, demand_dict = {}, {}, {}, {}, {}
 tags = []
 
 if "✏️ Manual Input Matrix" in input_mode:
+    # ============================================================
+    # MANUAL INPUT
+    # ============================================================
     st.markdown('<div class="card">', unsafe_allow_html=True)
     for i in range(n):
         c1, c2, c3, c4, c5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
@@ -540,11 +547,11 @@ if "✏️ Manual Input Matrix" in input_mode:
         styles_dict[tag], colors_dict[tag], sizes_dict[tag], original_qty[tag] = style_val, color_val, size_val, qty_val
         demand_dict[tag] = int(qty_val * (1 + addon / 100))
     st.markdown('</div>', unsafe_allow_html=True)
+
 else:
-   # ================================================================
-# EXCEL UPLOAD - COMPLETE FIXED
-# ================================================================
-else:
+    # ============================================================
+    # EXCEL UPLOAD - COMPLETE FIXED
+    # ============================================================
     st.markdown('<div class="card"><div class="card-title">📂 Upload Industrial Production Matrix</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader("Upload .xlsx Spreadsheet Matrix", type=["xlsx"])
     
@@ -587,14 +594,20 @@ else:
                 
                 col_map1, col_map2, col_map3, col_map4 = st.columns(4)
                 
-                style_col = col_map1.selectbox("🎨 Style Column", columns_list, 
-                                              index=columns_list.index(style_col) if style_col in columns_list else 0)
-                color_col = col_map2.selectbox("🌈 Color Column", columns_list,
-                                               index=columns_list.index(color_col) if color_col in columns_list else min(1, len(columns_list)-1))
-                size_col = col_map3.selectbox("📏 Size Column", columns_list,
-                                              index=columns_list.index(size_col) if size_col in columns_list else min(2, len(columns_list)-1))
-                qty_col = col_map4.selectbox("📊 Quantity Column", columns_list,
-                                             index=columns_list.index(qty_col) if qty_col in columns_list else min(3, len(columns_list)-1))
+                # স্মার্ট ডিফল্ট ইনডেক্স
+                default_style = columns_list.index(style_col) if style_col in columns_list else 0
+                default_color = columns_list.index(color_col) if color_col in columns_list else min(1, len(columns_list)-1)
+                default_size = columns_list.index(size_col) if size_col in columns_list else min(2, len(columns_list)-1)
+                default_qty = columns_list.index(qty_col) if qty_col in columns_list else min(3, len(columns_list)-1)
+                
+                with col_map1:
+                    style_col = st.selectbox("🎨 Style Column", columns_list, index=default_style)
+                with col_map2:
+                    color_col = st.selectbox("🌈 Color Column", columns_list, index=default_color)
+                with col_map3:
+                    size_col = st.selectbox("📏 Size Column", columns_list, index=default_size)
+                with col_map4:
+                    qty_col = st.selectbox("📊 Quantity Column", columns_list, index=default_qty)
             
             # ✅ ডেটা প্রসেস করুন
             items_loaded = 0
@@ -631,6 +644,19 @@ else:
             if items_loaded > 0:
                 st.success(f"✅ Successfully loaded {items_loaded} items from Excel!")
                 st.info(f"📋 Columns mapped: Style='{style_col}', Color='{color_col}', Size='{size_col}', Quantity='{qty_col}'")
+                
+                # ✅ প্রিভিউ দেখান
+                preview_data = []
+                for t in tags[:10]:
+                    preview_data.append({
+                        "Style": styles_dict.get(t, ""),
+                        "Color": colors_dict.get(t, ""),
+                        "Size": sizes_dict.get(t, ""),
+                        "Quantity": original_qty.get(t, 0)
+                    })
+                preview_df = pd.DataFrame(preview_data)
+                st.dataframe(preview_df, use_container_width=True)
+                
             else:
                 st.warning("⚠️ No valid data found. Please check your Excel file format.")
                 st.info("💡 Expected format: Columns with headers like 'Style', 'Color', 'Size', 'Quantity'")
@@ -638,9 +664,10 @@ else:
         except Exception as e:
             st.error(f"❌ Error parsing Excel: {str(e)}")
             st.info("💡 Make sure your Excel file has columns: Style, Color, Size, Quantity")
+    else:
+        st.info("📤 Please upload an Excel file to continue.")
     
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 # ================================================================
 # SYSTEM CORE PROCESSOR EXECUTION
