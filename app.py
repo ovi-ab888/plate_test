@@ -733,7 +733,9 @@ if st.session_state.get('run_success', False):
     
     st.write("##")
     
-    # Summary Sheet Output
+    # ============================================================
+    # SUMMARY SHEET OUTPUT (ONLY)
+    # ============================================================
     st.markdown('<div class="card"><div class="card-title">📊 Final Optimized Production Matrix</div>', unsafe_allow_html=True)
     df_summary = build_full_summary(plates, st.session_state['demand_dict'], st.session_state['original_qty'])
     if not df_summary.empty:
@@ -742,23 +744,14 @@ if st.session_state.get('run_success', False):
     st.dataframe(df_summary, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Detailed Expander Matrices
-    st.markdown('<div class="card"><div class="card-title">🛠️ Micro Layout Formats per Plate</div>', unsafe_allow_html=True)
-    sizes_local = st.session_state.get('sizes_dict', {})
-    for p in plates:
-        with st.expander(f"⚙️ Plate {p['name']} Layout Structure — ({p['sheets']} Sheets)", expanded=True):
-            p_cols = st.columns(2)
-            with p_cols[0]:
-                st.write("**Plate Ratio Allocation (UPS):**")
-                display_layout = {sizes_local.get(k, k): v for k, v in p["layout"].items() if v > 0}
-                st.json(display_layout)
-            with p_cols[1]:
-                st.write("**Net Physical Production Outputs:**")
-                display_prod = {sizes_local.get(k, k): v for k, v in p["production"].items() if v > 0}
-                st.json(display_prod)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # ============================================================
+    # ❌ MICRO LAYOUT FORMATS PER PLATE - REMOVED
+    # ============================================================
+    # এই অংশটি সম্পূর্ণ রিমুভ করা হয়েছে
     
-    # Documentation Export Pipeline
+    # ============================================================
+    # DOWNLOAD REPORTS
+    # ============================================================
     st.markdown('<div class="card"><div class="card-title">📥 Download Reports</div>', unsafe_allow_html=True)
     
     col_d1, col_d2 = st.columns(2)
