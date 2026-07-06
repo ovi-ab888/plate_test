@@ -1,5 +1,4 @@
-# app.py — COMPLETE PLATE RATIO SYSTEM (V1 to V26)
-# All Algorithms Fixed | No Negative Excess | Production Ready
+# app.py — COMPLETE PLATE RATIO SYSTEM (V27 ONLY SPECIAL EDITION)
 # Design by Ovi
 
 import os
@@ -21,13 +20,6 @@ import pandas as pd
 # LIBRARY IMPORTS & CHECKS
 # ================================================================
 
-# Try to import PuLP for Integer Solver
-try:
-    from pulp import LpProblem, LpMinimize, LpVariable, lpSum, value, LpInteger
-    PULP_AVAILABLE = True
-except ImportError:
-    PULP_AVAILABLE = False
-
 # Try to import reportlab for PDF
 try:
     from reportlab.lib import colors
@@ -39,19 +31,12 @@ try:
 except ImportError:
     REPORTLAB_AVAILABLE = False
 
-# Try to import OR-Tools for V19
-try:
-    from ortools.sat.python import cp_model
-    ORTOOLS_AVAILABLE = True
-except ImportError:
-    ORTOOLS_AVAILABLE = False
-
 
 # ================================================================
 # STREAMLIT PAGE CONFIGURATION
 # ================================================================
 st.set_page_config(
-    page_title="Plate Ratio System - Complete Edition",
+    page_title="Plate Ratio System - V27 Edition",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -186,143 +171,12 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>📊 Plate Ratio Intelligence System</h1>
-    <p>Complete Edition • 26 Algorithms • Production Ready</p>
+    <p>Complete Edition • Algorithm V27 Optimization • Production Ready</p>
     <p style="font-size: 0.85rem; opacity: 0.6;">AI-Powered • Fast • Accurate</p>
     <div class="designer-name">✨ Design by Ovi ✨</div>
 </div>
 """, unsafe_allow_html=True)
 
-
-
-# ================================================================
-# UNIVERSAL LAYOUT GENERATOR (FIXED FOR ALL ALGORITHMS)
-# ================================================================
-def create_valid_layout(active: dict, capacity: int, method: str = "balanced") -> dict:
-    """
-    Create a layout that respects capacity even when items > capacity
-    Methods: "balanced", "proportional", "greedy"
-    """
-    if not active:
-        return {}
-    
-    total_qty = sum(active.values())
-    n_items = len(active)
-    
-    # Special case: বেশি আইটেম, কম capacity
-    if n_items > capacity:
-        layout = {}
-        
-        if method == "balanced":
-            # প্রতিটি আইটেমের জন্য প্রপোরশনাল UPS
-            for tag, qty in active.items():
-                ups = max(1, int((qty / total_qty) * capacity))
-                layout[tag] = ups
-            
-            # Exact capacity enforce
-            while sum(layout.values()) > capacity:
-                max_tag = max(layout, key=layout.get)
-                if layout[max_tag] > 1:
-                    layout[max_tag] -= 1
-                else:
-                    # সব UPS 1 হলে, সবচেয়ে কম গুরুত্বপূর্ণ ট্যাগ 0 করো
-                    min_tag = min(active, key=lambda t: active[t])
-                    if layout.get(min_tag, 0) > 0:
-                        layout[min_tag] = 0
-                    else:
-                        break
-            
-            while sum(layout.values()) < capacity:
-                # সবচেয়ে বেশি ডিমান্ডের আইটেমকে প্রায়োরিটি দাও
-                max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
-                layout[max_tag] = layout.get(max_tag, 0) + 1
-            
-            return layout
-        
-        elif method == "greedy":
-            # প্রতিটি আইটেমের জন্য 1 করে দাও, তারপর বাকি capacity পূরণ করো
-            for tag in active.keys():
-                layout[tag] = 1
-            
-            remaining_cap = capacity - sum(layout.values())
-            
-            if remaining_cap > 0:
-                sorted_items = sorted(active.items(), key=lambda x: x[1], reverse=True)
-                for tag, _ in sorted_items:
-                    if remaining_cap <= 0:
-                        break
-                    layout[tag] = layout.get(tag, 1) + 1
-                    remaining_cap -= 1
-            
-            return layout
-        
-        elif method == "proportional":
-            # প্রপোরশনাল ভাগাভাগি
-            for tag, qty in active.items():
-                ups = int((qty / total_qty) * capacity)
-                if ups < 1:
-                    ups = 1 if len(active) <= capacity else 0
-                layout[tag] = ups
-            
-            # Exact capacity enforce
-            while sum(layout.values()) > capacity:
-                max_tag = max(layout, key=layout.get)
-                if layout[max_tag] > 1:
-                    layout[max_tag] -= 1
-                else:
-                    break
-            
-            while sum(layout.values()) < capacity:
-                max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
-                layout[max_tag] = layout.get(max_tag, 0) + 1
-            
-            return layout
-    
-    # Normal case: আইটেম সংখ্যা capacity এর কম বা সমান
-    layout = {}
-    
-    if method == "balanced":
-        for tag, qty in active.items():
-            ideal = (qty / total_qty) * capacity
-            base = int(ideal)
-            if base < 1:
-                base = 1
-            layout[tag] = base
-        
-        # Adjust to exact capacity
-        while sum(layout.values()) > capacity:
-            max_tag = max(layout, key=layout.get)
-            if layout[max_tag] > 1:
-                layout[max_tag] -= 1
-            else:
-                break
-        
-        while sum(layout.values()) < capacity:
-            # সবচেয়ে বেশি fractional part যার
-            fractional = {}
-            for tag, qty in active.items():
-                ideal = (qty / total_qty) * capacity
-                fractional[tag] = ideal - int(ideal)
-            best = max(fractional, key=fractional.get)
-            layout[best] = layout.get(best, 0) + 1
-    
-    else:  # proportional or greedy
-        for tag, qty in active.items():
-            ups = max(1, int((qty / total_qty) * capacity))
-            layout[tag] = ups
-        
-        while sum(layout.values()) > capacity:
-            max_tag = max(layout, key=layout.get)
-            if layout[max_tag] > 1:
-                layout[max_tag] -= 1
-            else:
-                break
-        
-        while sum(layout.values()) < capacity:
-            max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
-            layout[max_tag] = layout.get(max_tag, 0) + 1
-    
-    return layout
-    
 
 def plate_name(n: int) -> str:
     """Convert number to Excel-style column name (A, B, C, ..., Z, AA, AB, ...)"""
@@ -468,17 +322,13 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER
     except ImportError:
         return None
 
-    # Initialize empty dicts if not provided
-    if styles_dict is None:
-        styles_dict = {}
-    if colors_dict is None:
-        colors_dict = {}
-    if sizes_dict is None:
-        sizes_dict = {}
+    if styles_dict is None: styles_dict = {}
+    if colors_dict is None: colors_dict = {}
+    if sizes_dict is None: sizes_dict = {}
 
     try:
         buffer = BytesIO()
@@ -488,7 +338,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         )
         styles = getSampleStyleSheet()
 
-        # Custom styles
         title_style = ParagraphStyle(
             'CustomTitle', parent=styles['Heading1'],
             fontSize=14, alignment=TA_CENTER, 
@@ -516,7 +365,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 
         story = []
         
-        # Header with Job Number
         story.append(Paragraph("📊 Plate Ratio System - Ratio Report", title_style))
         if job_number:
             story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
@@ -527,8 +375,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         ))
         story.append(Spacer(1, 10))
 
-        # ============= MAIN SUMMARY TABLE =============
-        # Build header with all columns
         header_row = ["SL", "Style", "Color", "Size", "Original", "With Add-on"]
         for p in plates:
             header_row.append(f"Plate {p['name']}")
@@ -536,10 +382,8 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         
         summary_data = [header_row]
         
-        # Build data rows
         sl = 1
         for tag in demand.keys():
-            # Get style/color/size from session state or use defaults
             style = styles_dict.get(tag, "N/A")
             color = colors_dict.get(tag, "N/A")
             size = sizes_dict.get(tag, "N/A")
@@ -559,7 +403,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
             summary_data.append(row)
             sl += 1
         
-        # Total row
         total_row = ["📊", "TOTAL", "", "", 
                      str(sum(original_qty.values())), str(sum(demand.values()))]
         
@@ -578,10 +421,8 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         total_row.extend([str(total_produced_sum), str(total_excess_sum), total_excess_percent])
         summary_data.append(total_row)
         
-        # Create main table
         main_table = Table(summary_data, repeatRows=1)
         
-        # Style the table
         table_style = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -598,7 +439,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]
         
-        # Apply alternating row colors
         for i in range(1, len(summary_data) - 1):
             if i % 2 == 0:
                 table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f8f9fa')))
@@ -607,7 +447,6 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         story.append(main_table)
         story.append(Spacer(1, 15))
         
-        # ============= PLATE DETAILS TABLE =============
         story.append(Paragraph("🧾 Plate Configuration Details", 
                               ParagraphStyle('SubHeader', parent=styles['Heading2'],
                                            fontSize=11, alignment=TA_CENTER,
@@ -639,13 +478,11 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         story.append(plate_table)
         story.append(Spacer(1, 15))
         
-        # ============= FOOTER =============
         story.append(Paragraph(
             f"This Report Generated by Ovi's Plate Ratio System | Job: {job_number if job_number else 'N/A'} | All Rights Reserved",
             footer_style
         ))
         
-        # Build the PDF
         doc.build(story)
         buffer.seek(0)
         return buffer
@@ -655,10 +492,9 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         return None
 
 
-
-
-
-
+# ================================================================
+# V27 ALGORITHM IMPLEMENTATION
+# ================================================================
 def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60):
     """
     Algorithm V27: Dynamic Step-Down Balance Optimization (Multi-Scenario)
@@ -730,6 +566,7 @@ def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60):
             
             plates_list.append({
                 "plate_index": run_count,
+                "name": plate_name(run_count),
                 "layout": allocated_ups,
                 "sheets": run_sheets,
                 "production": plate_production
@@ -761,27 +598,16 @@ def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60):
     return best_result
 
 
-# ================================================================
-# MAIN UI
-# ================================================================
-st.markdown("""
-<div class="main-header">
-    <h1>📊 Plate Ratio Intelligence System</h1>
-    <p>Complete Edition • 26 Algorithms • Production Ready</p>
-    <p style="font-size: 0.85rem; opacity: 0.6;">AI-Powered • Fast • Accurate</p>
-</div>
-""", unsafe_allow_html=True)
-
 # ================== CONFIGURATION ==================
 st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">⚙️ Production Configuration</div>', unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
-    n = st.number_input("🏷️ Number of Items", 1, 500, 1)
+    n = st.number_input("🏷️ Number of Items", 1, 500, 3)
 with col2:
-    cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 10)
+    cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 60)
 with col3:
-    maxp = st.number_input("🎨 Max Plates", 1, 50, 3)
+    maxp = st.number_input("🎨 Max Plates", 1, 50, 10)
 with col4:
     addon = st.number_input("📈 Add-on (%)", 0.0, 50.0, 0.0, step=0.5)
 with col5:
@@ -791,13 +617,11 @@ with col5:
         placeholder="e.g., JOB-001",
         help="Enter a job number for tracking (optional)"
     )
-    # If empty, generate default
     if not job_number:
         job_number = f"JOB-{datetime.now().strftime('%Y%m%d_%H%M')}"
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Store job number in session state
 st.session_state['job_number'] = job_number
 
 # ================== INPUT MODE SELECTION ==================
@@ -812,627 +636,189 @@ input_mode = st.radio(
 
 st.markdown('</div>', unsafe_allow_html=True)
 
+tags = []
+styles = []
+colors = []
+sizes = []
+qty = []
+
+styles_dict = {}
+colors_dict = {}
+sizes_dict = {}
+original_qty = {}
+demand_dict = {}
+
 # ================== MANUAL INPUT ==================
 if input_mode == "✏️ Manual Input":
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
     
-    # Column headers
     col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
-    with col1:
-        st.markdown("**SL**")
-    with col2:
-        st.markdown("**Style**")
-    with col3:
-        st.markdown("**Color**")
-    with col4:
-        st.markdown("**Size**")
-    with col5:
-        st.markdown("**Quantity**")
+    with col1: st.markdown("**SL**")
+    with col2: st.markdown("**Style**")
+    with col3: st.markdown("**Color**")
+    with col4: st.markdown("**Size**")
+    with col5: st.markdown("**Quantity**")
     
     st.markdown("---")
-    
-    tags = []
-    styles = []
-    colors = []
-    sizes = []
-    qty = []
     
     for i in range(n):
         col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
         
         with col1:
             st.markdown(f"**{i+1}**")
-        
         with col2:
-            style_val = st.text_input(
-                "Style", 
-                value="N/A", 
-                key=f"style_{i}",
-                label_visibility="collapsed",
-                placeholder="N/A"
-            )
-        
+            style_val = st.text_input("Style", value=f"Style_{i+1}", key=f"style_{i}", label_visibility="collapsed")
         with col3:
-            color_val = st.text_input(
-                "Color", 
-                value="N/A", 
-                key=f"color_{i}",
-                label_visibility="collapsed",
-                placeholder="N/A"
-            )
-        
+            color_val = st.text_input("Color", value="Black", key=f"color_{i}", label_visibility="collapsed")
         with col4:
-            size_val = st.text_input(
-                "Size", 
-                value="N/A", 
-                key=f"size_{i}",
-                label_visibility="collapsed",
-                placeholder="N/A"
-            )
-        
+            size_val = st.text_input("Size", value=chr(83 + i % 4), key=f"size_{i}", label_visibility="collapsed")
         with col5:
-            qty_val = st.number_input(
-                "Quantity", 
-                min_value=0, 
-                value=0, 
-                step=100, 
-                key=f"qty_manual_{i}",
-                label_visibility="collapsed"
-            )
+            qty_val = st.number_input("Quantity", min_value=0, value=1000 * (i+1), step=100, key=f"qty_manual_{i}", label_visibility="collapsed")
         
-        # Store values
         style_display = style_val.strip() if style_val.strip() else "N/A"
         color_display = color_val.strip() if color_val.strip() else "N/A"
         size_display = size_val.strip() if size_val.strip() else "N/A"
         
-        styles.append(style_display)
-        colors.append(color_display)
-        sizes.append(size_display)
-        
-        # Create tag with style info (for display purposes)
-        tag = f"Item {i+1}"
-        if style_display != "N/A":
-            tag = f"{style_display}"
-        
+        tag = f"Item_{i+1}_{style_display}_{size_display}"
         tags.append(tag)
         qty.append(qty_val)
+        
+        styles_dict[tag] = style_display
+        colors_dict[tag] = color_display
+        sizes_dict[tag] = size_display
+        original_qty[tag] = qty_val
+        demand_dict[tag] = int(qty_val * (1 + addon / 100))
+        
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ================== EXCEL UPLOAD ==================
+else:
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Item Quantity Details (Excel Upload)</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload Excel File (.xlsx)", type=["xlsx"])
+    
+    if uploaded_file:
+        try:
+            df_xl = pd.read_excel(uploaded_file)
+            st.success("Excel File Loaded Successfully!")
+            st.dataframe(df_xl.head(), use_container_width=True)
+            
+            columns_list = list(df_xl.columns)
+            col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+            with col_c1: style_col = st.selectbox("Select Style Column", columns_list, index=0)
+            with col_c2: color_col = st.selectbox("Select Color Column", columns_list, index=min(1, len(columns_list)-1))
+            with col_c3: size_col = st.selectbox("Select Size Column", columns_list, index=min(2, len(columns_list)-1))
+            with col_c4: qty_col = st.selectbox("Select Quantity Column", columns_list, index=min(3, len(columns_list)-1))
+            
+            for index, row in df_xl.iterrows():
+                st_val = str(row[style_col]).strip() if style_col in df_xl.columns else "N/A"
+                cl_val = str(row[color_col]).strip() if color_col in df_xl.columns else "N/A"
+                sz_val = str(row[size_col]).strip() if size_col in df_xl.columns else "N/A"
+                q_val = int(row[qty_col]) if qty_col in df_xl.columns and pd.notnull(row[qty_col]) else 0
+                
+                tag = f"Item_{index+1}_{st_val}_{sz_val}"
+                tags.append(tag)
+                qty.append(q_val)
+                
+                styles_dict[tag] = st_val
+                colors_dict[tag] = cl_val
+                sizes_dict[tag] = sz_val
+                original_qty[tag] = q_val
+                demand_dict[tag] = int(q_val * (1 + addon / 100))
+        except Exception as e:
+            st.error(f"Error parsing Excel: {str(e)}")
+            
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ================== EXECUTION & OPTIMIZATION ==================
+if tags and sum(qty) > 0:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    
+    if st.button("🚀 Calculate V27 Optimal Ratios", type="primary"):
+        with st.spinner("Executing Algorithm V27 Simulation..."):
+            algo_res = algo_v27_dynamic_step_down_optimization(demand_dict, cap)
+            
+            if algo_res and algo_res["plates"]:
+                final_plates = ensure_demand_met(algo_res["plates"], demand_dict)
+                w_percent = calculate_waste_percent(final_plates, demand_dict)
+                
+                st.session_state['v27_plates'] = final_plates
+                st.session_state['v27_waste'] = w_percent
+                st.session_state['v27_produced'] = algo_res["produced"]
+                st.session_state['v27_factor'] = algo_res["factor_percentage"]
+                st.session_state['calculated'] = True
     
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Show preview with all columns
-    if any(q > 0 for q in qty):
-        preview_df = pd.DataFrame({
-            "SL": range(1, n + 1),
-            "Style": styles,
-            "Color": colors,
-            "Size": sizes,
-            "Quantity": qty
-        })
-        st.info("📋 Data Preview (showing all items)")
-        st.dataframe(preview_df, use_container_width=True, height=200)
-    
-    # Data Preparation
-    original_qty = {f"Item {i+1}": int(q) for i, q in enumerate(qty) if q > 0}
-    demand = {f"Item {i+1}": ceil(int(q) * (1 + addon / 100)) for i, q in enumerate(qty) if q > 0}
-    
-    # Store style/color/size info for later use
-    st.session_state['item_styles'] = {f"Item {i+1}": styles[i] for i in range(n)}
-    st.session_state['item_colors'] = {f"Item {i+1}": colors[i] for i in range(n)}
-    st.session_state['item_sizes'] = {f"Item {i+1}": sizes[i] for i in range(n)}
 
-# ================== EXCEL FILE UPLOAD ==================
-else:
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
+# ================== RESULTS DISPLAY ==================
+if st.session_state.get('calculated', False):
+    plates = st.session_state['v27_plates']
+    w_percent = st.session_state['v27_waste']
+    factor = st.session_state['v27_factor']
     
-    uploaded_file = st.file_uploader(
-        "Upload Excel file with Item Details",
-        type=["xlsx", "xls"],
-        help="File must have columns: SL, Style, Color, Size, Quantity"
-    )
+    # 🌟 Performance Summary Cards
+    st.markdown('<div class="best-algo">🎖️ Best Simulation Strategy Found: ' + factor + ' Scaling </div>', unsafe_allow_html=True)
     
-
+    c_m1, c_m2, c_m3 = st.columns(3)
+    with c_m1:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{len(plates)}</div><div class="metric-label">Total Plates Generated</div></div>', unsafe_allow_html=True)
+    with c_m2:
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{w_percent}%</div><div class="metric-label">Total Material Waste</div></div>', unsafe_allow_html=True)
+    with c_m3:
+        total_sheets_run = sum(p["sheets"] for p in plates)
+        st.markdown(f'<div class="metric-card"><div class="metric-value">{total_sheets_run}</div><div class="metric-label">Total Sheets To Print</div></div>', unsafe_allow_html=True)
+        
+    st.write("##")
     
-    if uploaded_file is not None:
-        try:
-            df = pd.read_excel(uploaded_file)
-            
-            # Remove completely empty rows
-            df = df.dropna(how='all')
-            
-            # Auto-detect columns
-            # Look for required columns
-            style_col = None
-            color_col = None
-            size_col = None
-            qty_col = None
-            sl_col = None
-            
-            for col in df.columns:
-                col_lower = str(col).lower().strip()
-                if col_lower in ['style', 'styles']:
-                    style_col = col
-                elif col_lower in ['color', 'colors', 'colour']:
-                    color_col = col
-                elif col_lower in ['size', 'sizes']:
-                    size_col = col
-                elif col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total']:
-                    qty_col = col
-                elif col_lower in ['sl', 's/l', 'serial', 'serial no', 'serial no.', 'no']:
-                    sl_col = col
-            
-            # If specific columns not found, try to map by position
-            if qty_col is None and len(df.columns) >= 2:
-                # Try to find quantity column (usually the last column with numbers)
-                for col in df.columns:
-                    if df[col].dtype in ['int64', 'float64']:
-                        qty_col = col
-                        break
-            
-            # If still not found, use last column as quantity
-            if qty_col is None and len(df.columns) >= 2:
-                qty_col = df.columns[-1]
-            
-            # If style/color/size not found, use empty strings or create from SL
-            if style_col is None:
-                style_col = df.columns[1] if len(df.columns) >= 2 else None
-            if color_col is None:
-                color_col = df.columns[2] if len(df.columns) >= 3 else None
-            if size_col is None:
-                size_col = df.columns[3] if len(df.columns) >= 4 else None
-            
-            if qty_col is None:
-                st.error("❌ Could not find 'Quantity' column. Please ensure your file has a quantity column.")
-                st.info("📌 Column names can be: 'Quantity', 'Qty', 'QTY', 'Total'")
-                st.stop()
-            
-            # Extract data
-            sl_data = df[sl_col].tolist() if sl_col else list(range(1, len(df) + 1))
-            style_data = df[style_col].astype(str).tolist() if style_col else ["N/A"] * len(df)
-            color_data = df[color_col].astype(str).tolist() if color_col else ["N/A"] * len(df)
-            size_data = df[size_col].astype(str).tolist() if size_col else ["N/A"] * len(df)
-            qty_data = df[qty_col].tolist()
-            
-            # Clean data: remove NaN, empty strings, and non-numeric quantities
-            cleaned_data = []
-            skipped_rows = 0
-            
-            for idx, (sl, style, color, size, qty) in enumerate(zip(sl_data, style_data, color_data, size_data, qty_data)):
-                # Skip if quantity is NaN or invalid
-                if pd.isna(qty):
-                    skipped_rows += 1
-                    continue
-                
-                try:
-                    qty_int = int(float(qty))  # Convert to int
-                    if qty_int > 0:  # Only keep positive quantities
-                        # Clean up values
-                        style_val = str(style).strip() if not pd.isna(style) and str(style).strip() != '' else "N/A"
-                        color_val = str(color).strip() if not pd.isna(color) and str(color).strip() != '' else "N/A"
-                        size_val = str(size).strip() if not pd.isna(size) and str(size).strip() != '' else "N/A"
-                        sl_val = int(sl) if not pd.isna(sl) and str(sl).strip() != '' else idx + 1
-                        
-                        cleaned_data.append((sl_val, style_val, color_val, size_val, qty_int))
-                    else:
-                        skipped_rows += 1
-                except (ValueError, TypeError):
-                    skipped_rows += 1
-                    continue
-            
-            if not cleaned_data:
-                st.error("❌ No valid data found in the file. Please check the format.")
-                st.stop()
-            
-            # Separate into lists
-            sl_list = [item[0] for item in cleaned_data]
-            style_list = [item[1] for item in cleaned_data]
-            color_list = [item[2] for item in cleaned_data]
-            size_list = [item[3] for item in cleaned_data]
-            qty_list = [item[4] for item in cleaned_data]
-            
-            # Show preview
-            preview_df = pd.DataFrame({
-                "SL": sl_list,
-                "Style": style_list,
-                "Color": color_list,
-                "Size": size_list,
-                "Quantity": qty_list
-            })
-            
-            st.success(f"✅ File loaded successfully! {len(cleaned_data)} valid items found.")
-            if skipped_rows > 0:
-                st.warning(f"⚠️ {skipped_rows} rows were skipped (empty or invalid data).")
-            
-            st.dataframe(preview_df, use_container_width=True)
-            
-            # Detected columns info
-            detected_cols = []
-            if sl_col:
-                detected_cols.append(f"SL = '{sl_col}'")
-            if style_col:
-                detected_cols.append(f"Style = '{style_col}'")
-            if color_col:
-                detected_cols.append(f"Color = '{color_col}'")
-            if size_col:
-                detected_cols.append(f"Size = '{size_col}'")
-            if qty_col:
-                detected_cols.append(f"Quantity = '{qty_col}'")
-            
-            st.info(f"📋 Detected columns: {', '.join(detected_cols)}")
-            
-            # Auto-set the number of items
-            n = len(cleaned_data)
-            tags = [f"Item {i+1}" for i in range(n)]
-            qty = qty_list
-            
-            # Store style/color/size data in session state for PDF
-            st.session_state['item_styles'] = {f"Item {i+1}": style_list[i] for i in range(n)}
-            st.session_state['item_colors'] = {f"Item {i+1}": color_list[i] for i in range(n)}
-            st.session_state['item_sizes'] = {f"Item {i+1}": size_list[i] for i in range(n)}
-            
-            original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
-            demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
-            
-        except Exception as e:
-            st.error(f"❌ Error reading file: {str(e)}")
-            st.stop()
-    else:
-        st.info("📤 Please upload an Excel file to continue.")
-        st.stop()
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ================== WARNING MESSAGES ==================
-if not PULP_AVAILABLE:
-    st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
-
-if not ORTOOLS_AVAILABLE:
-    st.markdown('<div class="warning">⚠️ OR-Tools not installed. V19 will be disabled. Install with: pip install ortools</div>', unsafe_allow_html=True)
-
-# ================== GENERATE BUTTON ==================
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    generate_clicked = st.button("Generate Plans", use_container_width=True, type="primary")
-
-# ================== AFTER GENERATE ==================
-if generate_clicked:
-    if not demand:
-        st.error("⚠️ Please enter at least one item with quantity greater than 0")
-        st.stop()
-
-    with st.spinner("🔍 Searching for the perfect plate ratio... Almost there!"):
-        
-        # ================== ALL ALGORITHMS V1-V26 ==================
-        results = {"Algorithm V27": algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity)}
-     
-        
-        # Run all algorithms with progress bar
-        results = {}
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        for idx, (algo_name, func) in enumerate(algo_functions.items()):
-            status_text.text(f"Running {algo_name}... ({idx+1}/{len(algo_functions)})")
-            try:
-                if maxp == 1 and algo_name in problematic_for_single_plate:
-                    results[algo_name] = v3_optimizer(demand, cap, maxp)
-                else:
-                    results[algo_name] = func()
-            except Exception as e:
-                results[algo_name] = v3_optimizer(demand, cap, maxp)
-            
-            progress_bar.progress((idx + 1) / len(algo_functions))
-        
-        progress_bar.empty()
-        status_text.empty()
-        
-        # Global fix for all algorithms
-        for algo_name, plates in results.items():
-            if plates:
-                results[algo_name] = ensure_demand_met(plates, demand)
-            else:
-                results[algo_name] = v3_optimizer(demand, cap, maxp)
-        
-        # Comparison Data
-        comparison_data = []
-        for algo_name, plates in results.items():
-            if plates:
-                waste = calculate_waste_percent(plates, demand)
-                comparison_data.append({
-                    "Algorithm": algo_name,
-                    "Waste %": waste,
-                    "Total Plates": len(plates),
-                    "Total Sheets": sum(p.get("sheets", 0) for p in plates),
-                    "Status": "✅ Success"
-                })
-            else:
-                comparison_data.append({
-                    "Algorithm": algo_name,
-                    "Waste %": 100,
-                    "Total Plates": 0,
-                    "Total Sheets": 0,
-                    "Status": "❌ Failed"
-                })
-        
-        comparison_df = pd.DataFrame(comparison_data).sort_values("Waste %")
-        best_algo = comparison_df.iloc[0]["Algorithm"]
-        best_waste = comparison_df.iloc[0]["Waste %"]
-        
-        # Store in session state
-        st.session_state['results'] = results
-        st.session_state['comparison_df'] = comparison_df
-        st.session_state['best_algo'] = best_algo
-        st.session_state['best_waste'] = best_waste
-        st.session_state['demand'] = demand
-        st.session_state['original_qty'] = original_qty
-        
-        # ====================== UI OUTPUT ======================
-        st.markdown(f"""
-        <div class="best-algo">
-            <div class="metric-value">🏆 BEST ALGORITHM: {best_algo}</div>
-            <div class="metric-label">Waste Percentage: {best_waste}%</div>
-            <div class="metric-label">✨ Total Algorithms Tested: {len(results)} ✨</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # ============= BEST ALGORITHM REPORT =============
-        st.markdown("## 📋 Best Algorithm Report")
-        best_plates = results[best_algo]
-        
-        if best_plates:
-            try:
-                st.markdown("### 📊 Production Summary")
-                full_df = build_full_summary(best_plates, demand, original_qty)
-                if not full_df.empty:
-                    st.dataframe(full_df, use_container_width=True, height=380)
-                
-                st.markdown("### 🧾 Plate Configuration Details")
-                plate_rows = []
-                total_sheets_sum = 0
-                total_ups_sum = 0
-                
-                for idx, p in enumerate(best_plates, 1):
-                    if p and "layout" in p:
-                        total_ups = sum(p["layout"].values())
-                        plate_name_str = p.get("name", f"Plate {idx}")
-                        plate_rows.append({
-                            "SL": idx,
-                            "Plate ID": plate_name_str,
-                            "Sheets Required": p.get("sheets", 0),
-                            "Total UPS": total_ups,
-                        })
-                        total_sheets_sum += p.get("sheets", 0)
-                        total_ups_sum += total_ups
-                
-                plate_rows.append({
-                    "SL": "📊",
-                    "Plate ID": "TOTAL",
-                    "Sheets Required": total_sheets_sum,
-                    "Total UPS": total_ups_sum,
-                })
-                
-                plate_details_df = pd.DataFrame(plate_rows)
-                st.dataframe(plate_details_df, use_container_width=True)
-                
-                # ============= DOWNLOAD BUTTONS =============
-                st.markdown("### 📥 Download Best Report")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    bio_excel = BytesIO()
-                    with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
-                        full_df.to_excel(writer, sheet_name="Summary", index=False)
-                        plate_details_df.to_excel(writer, sheet_name="Plate Details", index=False)
-                        comparison_df.to_excel(writer, sheet_name="Comparison", index=False)
-                    bio_excel.seek(0)
-                    
-                    # Clean job number for Excel filename
-                    job_number = st.session_state.get('job_number', 'JOB-00000')
-                    clean_job = ''.join(c for c in job_number if c.isalnum() or c == '-')
-                    excel_filename = f"{clean_job}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-                    
-                    st.download_button(
-                        "📊 Download Excel",
-                        bio_excel,
-                        excel_filename,
-                        use_container_width=True
-                    )
-                
-                with col2:
-                    # Check if reportlab is available
-                    try:
-                        import reportlab
-                        REPORTLAB_AVAILABLE = True
-                    except ImportError:
-                        REPORTLAB_AVAILABLE = False
-                    
-                    if REPORTLAB_AVAILABLE:
-                        try:
-                            # Get style/color/size data from session state
-                            styles_dict = st.session_state.get('item_styles', {})
-                            colors_dict = st.session_state.get('item_colors', {})
-                            sizes_dict = st.session_state.get('item_sizes', {})
-                            job_number = st.session_state.get('job_number', 'JOB-00000')
-                            
-                            pdf_buffer = generate_pdf_report(
-                                best_plates,
-                                demand,
-                                original_qty,
-                                best_algo,
-                                best_waste,
-                                styles_dict,
-                                colors_dict,
-                                sizes_dict,
-                                job_number
-                            )
-                            
-                            if pdf_buffer:
-                                # Clean job number for filename
-                                clean_job = ''.join(c for c in job_number if c.isalnum() or c == '-')
-                                pdf_filename = f"Job_Number_{clean_job}.pdf"
-                                
-                                st.download_button(
-                                    "📄 Download PDF",
-                                    pdf_buffer,
-                                    pdf_filename,
-                                    mime="application/pdf",
-                                    use_container_width=True
-                                )
-                            else:
-                                st.warning("⚠️ PDF could not be generated. Please check the data.")
-                        except Exception as e:
-                            st.error(f"❌ PDF Error: {str(e)}")
-                    else:
-                        st.info("ℹ️ PDF download requires reportlab. Install with: pip install reportlab")
-            
-            except Exception as e:
-                st.error(f"Error generating report: {str(e)}")
-                st.info("Showing comparison table instead...")
-        
-        # ============= ALGORITHM COMPARISON =============
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        styled_df = comparison_df.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
-            if row["Algorithm"] == best_algo else [''] * len(row),
-            axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=600)
-
-# ============= VIEW ANY ALGORITHM REPORT =============
-st.markdown("---")
-st.markdown("## 🔍 View Individual Algorithm Report")
-
-if 'results' in st.session_state and st.session_state['results']:
-    algo_list = list(st.session_state['results'].keys())
+    # Summary Table Display
+    st.markdown('<div class="card"><div class="card-title">📊 Complete Production Layout Sheet</div>', unsafe_allow_html=True)
+    df_summary = build_full_summary(plates, demand_dict, original_qty)
     
-    default_index = 0
-    if st.session_state.get('best_algo') in algo_list:
-        default_index = algo_list.index(st.session_state['best_algo'])
+    # Replace Technical internal tags with beautiful style labels for presentation
+    if not df_summary.empty:
+        df_summary['Tag'] = df_summary['Tag'].apply(lambda x: styles_dict.get(x, x) if x != "TOTAL" else "TOTAL")
     
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        selected_algo = st.selectbox(
-            "Select Algorithm to View Report:",
-            options=algo_list,
-            index=default_index,
-            key="independent_algo_selector"
-        )
+    st.dataframe(df_summary, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        view_button = st.button("📋 View Report", use_container_width=True, type="primary")
+    # Plate Layout Breakdowns
+    st.markdown('<div class="card"><div class="card-title">🛠️ Individual Plate Matrix Detail</div>', unsafe_allow_html=True)
+    for p in plates:
+        with st.expander(f"📦 Plate {p['name']} — Print Run: {p['sheets']} Sheets", expanded=True):
+            p_cols = st.columns(2)
+            with p_cols[0]:
+                st.write("**Ratio Layout (UPS Allocation per Size):**")
+                display_layout = {sizes_dict.get(k, k): v for k, v in p["layout"].items() if v > 0}
+                st.json(display_layout)
+            with p_cols[1]:
+                st.write("**Total Output Pieces from this Plate:**")
+                display_prod = {sizes_dict.get(k, k): v for k, v in p["production"].items() if v > 0}
+                st.json(display_prod)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    if view_button:
-        selected_plates = st.session_state['results'].get(selected_algo)
+    # PDF Export Section
+    if REPORTLAB_AVAILABLE:
+        st.markdown('<div class="card"><div class="card-title">📄 Export Professional Documents</div>', unsafe_allow_html=True)
+        pdf_buffer = generate_pdf_report(plates, demand_dict, original_qty, "Algorithm V27 (Step-Down)", w_percent, styles_dict, colors_dict, sizes_dict, job_number)
         
-        if selected_plates:
-            st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
-            
-            full_df = build_full_summary(
-                selected_plates, 
-                st.session_state['demand'], 
-                st.session_state['original_qty']
+        if pdf_buffer:
+            st.download_button(
+                "📥 Download Ratio Analysis PDF Report",
+                pdf_buffer,
+                f"{job_number}_V27_Report.pdf",
+                mime="application/pdf",
+                use_container_width=True
             )
-            st.dataframe(full_df, use_container_width=True, height=400)
-            
-            st.markdown("### 🧾 Plate Configuration Details")
-            plate_rows = []
-            total_sheets = 0
-            total_ups = 0
-            
-            for idx, p in enumerate(selected_plates, 1):
-                ups_sum = sum(p["layout"].values())
-                plate_rows.append({
-                    "SL": idx,
-                    "Plate ID": p.get("name", f"Plate {idx}"),
-                    "Sheets Required": p.get("sheets", 0),
-                    "Total UPS": ups_sum,
-                })
-                total_sheets += p.get("sheets", 0)
-                total_ups += ups_sum
-            
-            plate_rows.append({
-                "SL": "📊",
-                "Plate ID": "TOTAL",
-                "Sheets Required": total_sheets,
-                "Total UPS": total_ups,
-            })
-            
-            plate_df = pd.DataFrame(plate_rows)
-            st.dataframe(plate_df, use_container_width=True)
-            
-            waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
-            st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
-            
-            # ✅ ডাউনলোড অপশন
-            st.markdown("### 📥 Download Report")
-            col_d1, col_d2 = st.columns(2)
-            
-            with col_d1:
-                try:
-                    bio_excel = BytesIO()
-                    with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
-                        full_df.to_excel(writer, sheet_name="Summary", index=False)
-                        plate_df.to_excel(writer, sheet_name="Plate Details", index=False)
-                    bio_excel.seek(0)
-                    
-                    st.download_button(
-                        "📊 Download Excel",
-                        bio_excel,
-                        f"{selected_algo}_report.xlsx",
-                        use_container_width=True
-                    )
-                except Exception as e:
-                    st.error(f"Excel export error: {str(e)}")
-            
-            with col_d2:
-                if REPORTLAB_AVAILABLE:
-                    try:
-                        styles_dict = st.session_state.get('item_styles', {})
-                        colors_dict = st.session_state.get('item_colors', {})
-                        sizes_dict = st.session_state.get('item_sizes', {})
-                        job_number = st.session_state.get('job_number', 'JOB-00000')
-                        
-                        pdf_buffer = generate_pdf_report(
-                            selected_plates,
-                            st.session_state['demand'],
-                            st.session_state['original_qty'],
-                            selected_algo,
-                            waste,
-                            styles_dict,
-                            colors_dict,
-                            sizes_dict,
-                            job_number
-                        )
-                        
-                        if pdf_buffer:
-                            st.download_button(
-                                "📄 Download PDF",
-                                pdf_buffer,
-                                f"{selected_algo}_report.pdf",
-                                mime="application/pdf",
-                                use_container_width=True
-                            )
-                    except Exception as e:
-                        st.warning(f"PDF not available: {str(e)}")
-        else:
-            st.error(f"❌ Report not found for {selected_algo}")
-else:
-    st.info("ℹ️ Please generate the optimization first to view individual algorithm reports.")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
 <div style="text-align: center; padding: 2rem; margin-top: 3rem; border-top: 2px solid rgba(102,126,234,0.3); background: rgba(255,255,255,0.02); border-radius: 20px;">
     <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;">
-        © 2025 Plate Ratio System | Version 26 (Complete Edition)
+        © 2026 Plate Ratio System | Version 27 (Testing Edition)
     </p>
     <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 8px 0;">
-        Enterprise Production Optimization Framework • 26 Algorithms • Production Ready
-    </p>
-    <p style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 0.85rem; font-weight: 600; margin: 10px 0 0 0;">
-        ✨ Developed by Ovi | All Rights Reserved ✨
+        Enterprise Production Optimization Framework • Manual Logic Injected • Production Ready
     </p>
 </div>
 """, unsafe_allow_html=True)
