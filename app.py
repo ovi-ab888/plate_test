@@ -178,6 +178,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+# ================================================================
+# HELPER FUNCTIONS
+# ================================================================
+
 def plate_name(n: int) -> str:
     """Convert number to Excel-style column name (A, B, C, ..., Z, AA, AB, ...)"""
     n -= 1
@@ -224,6 +228,7 @@ def ensure_demand_met(plates: list, demand: dict) -> list:
     if not plates:
         return plates
     
+    # First pass: check if demand is met
     for tag in demand.keys():
         total_produced = 0
         for plate in plates:
@@ -318,13 +323,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
                         styles_dict: dict = None, colors_dict: dict = None, 
                         sizes_dict: dict = None, job_number: str = "") -> BytesIO | None:
     """Generate professional PDF report with Style, Color, Size columns and Job Number"""
-    try:
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER
-    except ImportError:
+    if not REPORTLAB_AVAILABLE:
         return None
 
     if styles_dict is None: styles_dict = {}
@@ -366,7 +365,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 
         story = []
         
-        story.append(Paragraph("📊 Plate Ratio System - Ratio Report", title_style))
+        story.append(Paragraph("📊 Plate Ratio System - V27 Report", title_style))
         if job_number:
             story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
         story.append(Paragraph(
@@ -496,127 +495,149 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 # ================================================================
 # V27 ALGORITHM IMPLEMENTATION (🎨 MAX PLATES ENFORCED)
 # ================================================================
-def v27_optimized(demand_dict, plate_capacity=60, max_plates=10, iterations=50):
+
+def algo_v27_dynamic_step_down_optimization(demand_dict, plate_capacity=60, max_plates=10):
     """
-    V27 - Optimized Version
-    Inspired by Ovi's Manual Excel Workflow
+    Algorithm V27: Dynamic Step-Down Balance Optimization (Multi-Scenario)
+    Inspired & Designed by Ovi's Manual Excel Workflow.
+    Strictly enforces max_plates constraints on the final run.
     """
+    TOTAL_UPS = plate_capacity
+    scaling_factors = [0.80, 0.90, 1.00, 1.10, 1.20]
+    best_result = None
+    min_total_waste = float('inf')
     
-    def calculate_waste(plates, demand):
-        total_produced = 0
-        total_demand = sum(demand.values())
+    for factor in scaling_factors:
+        current_demand = copy.deepcopy(demand_dict)
+        plates_list = []
+        run_count = 1
         
-        for plate in plates:
-            for tag, ups in plate["layout"].items():
-                total_produced += ups * plate["sheets"]
+        total_initial_demand = sum(current_demand.values())
+        if total_initial_demand == 0:
+            continue
+        estimated_sheets = total_initial_demand / TOTAL_UPS
+        initial_target_sheets = max(1, int(round(estimated_sheets * factor)))
         
-        if total_produced == 0:
-            return 100.0
+        is_first_run = True
         
-        waste = total_produced - total_demand
-        return (waste / total_produced) * 100
-    
-    def create_layout(remaining, capacity):
-        """Smart UPS Distribution"""
-        active = {k: v for k, v in remaining.items() if v > 0}
-        if not active:
-            return {}
-        
-        total_active = sum(active.values())
-        layout = {}
-        used = 0
-        
-        # Proportional distribution
-        for tag, qty in sorted(active.items(), key=lambda x: x[1], reverse=True):
-            if used >= capacity:
-                break
-            ups = max(1, int((qty / total_active) * capacity))
-            ups = min(ups, capacity - used)
-            if ups > 0:
-                layout[tag] = ups
-                used += ups
-        
-        # Fill remaining
-        while used < capacity and active:
-            best = max(active, key=lambda t: remaining[t] / (layout.get(t, 1) + 1))
-            layout[best] = layout.get(best, 0) + 1
-            used += 1
-        
-        return layout
-    
-    def simulate_with_sheets(sheets):
-        """Simulate one scenario with given sheets"""
-        remaining = demand_dict.copy()
-        plates = []
-        plate_count = 0
-        
-        while plate_count < max_plates and any(v > 0 for v in remaining.values()):
-            # Create layout
-            layout = create_layout(remaining, plate_capacity)
-            if not layout:
+        while sum(current_demand.values()) > 0 and run_count <= max_plates:
+            active_sizes = {k: v for k, v in current_demand.items() if v > 0}
+            if not active_sizes:
                 break
             
-            # Calculate sheets for this plate
-            if plate_count == max_plates - 1:  # Last plate
-                needed = []
-                for tag, ups in layout.items():
-                    if ups > 0 and remaining.get(tag, 0) > 0:
-                        needed.append(ceil(remaining[tag] / ups))
-                current_sheets = max(needed) if needed else sheets
+            # If it is the last allowed plate, ensure ALL active sizes are allocated at least 1 UP if possible
+            if run_count == max_plates:
+                allocated_ups = {}
+                if len(active_sizes) <= TOTAL_UPS:
+                    for size in active_sizes:
+                        allocated_ups[size] = 1
+                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                    if remaining_ups > 0:
+                        sorted_sizes = sorted(active_sizes.items(), key=lambda x: x[1], reverse=True)
+                        for size, _ in sorted_sizes:
+                            if remaining_ups == 0:
+                                break
+                            allocated_ups[size] += 1
+                            remaining_ups -= 1
+                else:
+                    total_active_demand = sum(active_sizes.values())
+                    allocated_ups = {size: int(floor((qty / total_active_demand) * TOTAL_UPS)) for size, qty in active_sizes.items()}
+                    remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                    if remaining_ups > 0:
+                        sorted_by_remainder = sorted(active_sizes.items(), key=lambda x: (x[1]/total_active_demand * TOTAL_UPS) - floor((x[1]/total_active_demand) * TOTAL_UPS), reverse=True)
+                        for size, _ in sorted_by_remainder:
+                            if remaining_ups == 0:
+                                break
+                            allocated_ups[size] += 1
+                            remaining_ups -= 1
             else:
-                current_sheets = sheets
+                total_active_demand = sum(active_sizes.values())
+                raw_ups = {}
+                for size, qty in active_sizes.items():
+                    raw_ups[size] = (qty / total_active_demand) * TOTAL_UPS
+                
+                allocated_ups = {size: max(1, int(floor(val))) for size, val in raw_ups.items()}
+                
+                remaining_ups = TOTAL_UPS - sum(allocated_ups.values())
+                if remaining_ups > 0:
+                    sorted_by_remainder = sorted(raw_ups.items(), key=lambda x: x[1] - allocated_ups[x[0]], reverse=True)
+                    for size, _ in sorted_by_remainder:
+                        if remaining_ups == 0:
+                            break
+                        allocated_ups[size] += 1
+                        remaining_ups -= 1
+                
+                if sum(allocated_ups.values()) > TOTAL_UPS:
+                    sorted_by_ups = sorted(allocated_ups.items(), key=lambda x: x[1], reverse=True)
+                    for size, _ in sorted_by_ups:
+                        if sum(allocated_ups.values()) == TOTAL_UPS:
+                            break
+                        if allocated_ups[size] > 1:
+                            allocated_ups[size] -= 1
+
+            # Determine run sheets
+            if is_first_run:
+                run_sheets = initial_target_sheets
+                is_first_run = False
+                if run_count == max_plates:
+                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
+                    if needed_sheets:
+                        run_sheets = max(run_sheets, max(needed_sheets))
+            else:
+                if run_count == max_plates:
+                    needed_sheets = [ceil(current_demand[sz] / max(1, allocated_ups.get(sz, 1))) for sz in active_sizes if allocated_ups.get(sz, 0) > 0]
+                    run_sheets = max(needed_sheets) if needed_sheets else 1
+                else:
+                    min_sheet_needed = float('inf')
+                    for size, qty in active_sizes.items():
+                        ups = allocated_ups.get(size, 1)
+                        needed = int(ceil(qty / ups))
+                        if needed < min_sheet_needed:
+                            min_sheet_needed = needed
+                    run_sheets = max(1, min_sheet_needed)
             
-            # Apply layout
-            for tag, ups in layout.items():
-                remaining[tag] = max(0, remaining[tag] - (ups * current_sheets))
+            plate_production = {}
+            for size, ups in allocated_ups.items():
+                plate_production[size] = ups * run_sheets
+                current_demand[size] = max(0, current_demand[size] - plate_production[size])
             
-            plates.append({
-                "name": plate_name(plate_count + 1),
-                "layout": layout,
-                "sheets": current_sheets
+            plates_list.append({
+                "plate_index": run_count,
+                "name": plate_name(run_count),
+                "layout": allocated_ups,
+                "sheets": run_sheets,
+                "production": plate_production
             })
             
-            plate_count += 1
-        
-        return plates
-    
-    # ================================================================
-    # MAIN LOGIC
-    # ================================================================
-    
-    total_qty = sum(demand_dict.values())
-    capacity_per_round = max_plates * plate_capacity
-    estimated_sheets = ceil(total_qty / capacity_per_round)
-    
-    # Generate candidate sheets
-    candidate_sheets = []
-    for i in range(-iterations//2, iterations//2 + 1):
-        candidate = estimated_sheets + i
-        if candidate >= 1:
-            candidate_sheets.append(candidate)
-    candidate_sheets = sorted(set(candidate_sheets))
-    
-    # Test each candidate
-    best_plates = None
-    best_waste = float('inf')
-    best_sheets = None
-    
-    for sheets in candidate_sheets:
-        plates = simulate_with_sheets(sheets)
-        if plates:
-            waste = calculate_waste(plates, demand_dict)
-            if waste < best_waste:
-                best_waste = waste
-                best_plates = plates
-                best_sheets = sheets
-    
-    return {
-        "plates": ensure_demand_met(best_plates, demand_dict),
-        "waste_percent": best_waste,
-        "sheets_used": best_sheets,
-        "total_plates": len(best_plates) if best_plates else 0,
-        "candidates_tested": len(candidate_sheets)
-    }
+            run_count += 1
+            
+        total_produced = {size: 0 for size in demand_dict.keys()}
+        for p in plates_list:
+            for size, qty in p["production"].items():
+                total_produced[size] += qty
+                
+        scenario_waste = 0
+        for size, target in demand_dict.items():
+            produced = total_produced.get(size, 0)
+            excess = produced - target
+            if excess > 0:
+                scenario_waste += excess
+                
+        if scenario_waste < min_total_waste:
+            min_total_waste = scenario_waste
+            best_result = {
+                "plates": plates_list,
+                "waste": scenario_waste,
+                "produced": total_produced,
+                "factor_percentage": f"{int(factor * 100)}%"
+            }
+            
+    return best_result
+
+
+# ================================================================
+# MAIN UI
+# ================================================================
 
 # ================== CONFIGURATION ==================
 st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">⚙️ Production Configuration</div>', unsafe_allow_html=True)
@@ -627,7 +648,7 @@ with col1:
 with col2:
     cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 60)
 with col3:
-    maxp = st.number_input("🎨 Max Plates", 1, 50, 3) # Default value updated to 3 as requested
+    maxp = st.number_input("🎨 Max Plates", 1, 50, 3)
 with col4:
     addon = st.number_input("📈 Add-on (%)", 0.0, 50.0, 0.0, step=0.5)
 with col5:
@@ -725,10 +746,14 @@ else:
             
             columns_list = list(df_xl.columns)
             col_c1, col_c2, col_c3, col_c4 = st.columns(4)
-            with col_c1: style_col = st.selectbox("Select Style Column", columns_list, index=0 if "Style" not in columns_list else columns_list.index("Style"))
-            with col_c2: color_col = st.selectbox("Select Color Column", columns_list, index=min(1, len(columns_list)-1) if "Color" not in columns_list else columns_list.index("Color"))
-            with col_c3: size_col = st.selectbox("Select Size Column", columns_list, index=min(2, len(columns_list)-1) if "Size" not in columns_list else columns_list.index("Size"))
-            with col_c4: qty_col = st.selectbox("Select Quantity Column", columns_list, index=min(3, len(columns_list)-1) if "Quantity" not in columns_list else columns_list.index("Quantity"))
+            with col_c1: 
+                style_col = st.selectbox("Select Style Column", columns_list, index=0 if "Style" not in columns_list else columns_list.index("Style"))
+            with col_c2: 
+                color_col = st.selectbox("Select Color Column", columns_list, index=min(1, len(columns_list)-1) if "Color" not in columns_list else columns_list.index("Color"))
+            with col_c3: 
+                size_col = st.selectbox("Select Size Column", columns_list, index=min(2, len(columns_list)-1) if "Size" not in columns_list else columns_list.index("Size"))
+            with col_c4: 
+                qty_col = st.selectbox("Select Quantity Column", columns_list, index=min(3, len(columns_list)-1) if "Quantity" not in columns_list else columns_list.index("Quantity"))
             
             for index, row in df_xl.iterrows():
                 st_val = str(row[style_col]).strip() if style_col in df_xl.columns else "N/A"
@@ -768,6 +793,13 @@ if tags and sum(qty) > 0:
                 st.session_state['v27_produced'] = algo_res["produced"]
                 st.session_state['v27_factor'] = algo_res["factor_percentage"]
                 st.session_state['calculated'] = True
+                st.session_state['original_qty'] = original_qty
+                st.session_state['demand_dict'] = demand_dict
+                st.session_state['styles_dict'] = styles_dict
+                st.session_state['colors_dict'] = colors_dict
+                st.session_state['sizes_dict'] = sizes_dict
+            else:
+                st.error("❌ No solution found. Please check your inputs.")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -778,7 +810,14 @@ if st.session_state.get('calculated', False):
     factor = st.session_state['v27_factor']
     
     # 🌟 Performance Summary Cards
-    st.markdown('<div class="best-algo">🎖️ Best Simulation Strategy Found: ' + factor + ' Scaling </div>', unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="best-algo">
+        🎖️ Best Simulation Strategy Found: <strong>{factor}</strong> Scaling 
+        <span style="margin-left: 20px; font-size: 0.9rem;">
+            | Waste: {w_percent}%
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     
     c_m1, c_m2, c_m3 = st.columns(3)
     with c_m1:
@@ -793,46 +832,93 @@ if st.session_state.get('calculated', False):
     
     # Summary Table Display
     st.markdown('<div class="card"><div class="card-title">📊 Complete Production Layout Sheet</div>', unsafe_allow_html=True)
-    df_summary = build_full_summary(plates, demand_dict, original_qty)
+    df_summary = build_full_summary(plates, st.session_state['demand_dict'], st.session_state['original_qty'])
     
     # Replace Technical internal tags with beautiful style labels for presentation
     if not df_summary.empty:
-        df_summary['Tag'] = df_summary['Tag'].apply(lambda x: styles_dict.get(x, x) if x != "TOTAL" else "TOTAL")
+        styles_dict_local = st.session_state.get('styles_dict', {})
+        df_summary['Tag'] = df_summary['Tag'].apply(lambda x: styles_dict_local.get(x, x) if x != "TOTAL" else "TOTAL")
     
     st.dataframe(df_summary, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Plate Layout Breakdowns
     st.markdown('<div class="card"><div class="card-title">🛠️ Individual Plate Matrix Detail</div>', unsafe_allow_html=True)
+    sizes_dict_local = st.session_state.get('sizes_dict', {})
     for p in plates:
         with st.expander(f"📦 Plate {p['name']} — Print Run: {p['sheets']} Sheets", expanded=True):
             p_cols = st.columns(2)
             with p_cols[0]:
                 st.write("**Ratio Layout (UPS Allocation per Size):**")
-                display_layout = {sizes_dict.get(k, k): v for k, v in p["layout"].items() if v > 0}
+                display_layout = {sizes_dict_local.get(k, k): v for k, v in p["layout"].items() if v > 0}
                 st.json(display_layout)
             with p_cols[1]:
                 st.write("**Total Output Pieces from this Plate:**")
-                display_prod = {sizes_dict.get(k, k): v for k, v in p["production"].items() if v > 0}
+                display_prod = {sizes_dict_local.get(k, k): v for k, v in p["production"].items() if v > 0}
                 st.json(display_prod)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # PDF Export Section
-    if REPORTLAB_AVAILABLE:
-        st.markdown('<div class="card"><div class="card-title">📄 Export Professional Documents</div>', unsafe_allow_html=True)
-        pdf_buffer = generate_pdf_report(plates, demand_dict, original_qty, "Algorithm V27 (Step-Down)", w_percent, styles_dict, colors_dict, sizes_dict, job_number)
+    # Download Section
+    st.markdown('<div class="card"><div class="card-title">📥 Download Reports</div>', unsafe_allow_html=True)
+    
+    col_d1, col_d2 = st.columns(2)
+    
+    with col_d1:
+        # Excel Download
+        bio_excel = BytesIO()
+        with pd.ExcelWriter(bio_excel, engine="openpyxl") as writer:
+            df_summary.to_excel(writer, sheet_name="Summary", index=False)
+            
+            # Plate details
+            plate_rows = []
+            for p in plates:
+                plate_rows.append({
+                    "Plate ID": p["name"],
+                    "Sheets": p["sheets"],
+                    "Total UPS": sum(p["layout"].values()),
+                    "Layout": str(p["layout"])
+                })
+            pd.DataFrame(plate_rows).to_excel(writer, sheet_name="Plate Details", index=False)
         
-        if pdf_buffer:
-            st.download_button(
-                "📥 Download Ratio Analysis PDF Report",
-                pdf_buffer,
-                f"{job_number}_V27_Report.pdf",
-                mime="application/pdf",
-                use_container_width=True
+        bio_excel.seek(0)
+        st.download_button(
+            "📊 Download Excel Report",
+            bio_excel,
+            f"{job_number}_V27_Report.xlsx",
+            use_container_width=True
+        )
+    
+    with col_d2:
+        # PDF Download
+        if REPORTLAB_AVAILABLE:
+            pdf_buffer = generate_pdf_report(
+                plates, 
+                st.session_state['demand_dict'], 
+                st.session_state['original_qty'], 
+                "Algorithm V27 (Step-Down)", 
+                w_percent, 
+                st.session_state.get('styles_dict', {}),
+                st.session_state.get('colors_dict', {}),
+                st.session_state.get('sizes_dict', {}),
+                job_number
             )
-        st.markdown('</div>', unsafe_allow_html=True)
+            
+            if pdf_buffer:
+                st.download_button(
+                    "📄 Download PDF Report",
+                    pdf_buffer,
+                    f"{job_number}_V27_Report.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+        else:
+            st.info("ℹ️ PDF download requires reportlab. Install with: pip install reportlab")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Footer
+# ================================================================
+# FOOTER
+# ================================================================
 st.markdown("""
 <div style="text-align: center; padding: 2rem; margin-top: 3rem; border-top: 2px solid rgba(102,126,234,0.3); background: rgba(255,255,255,0.02); border-radius: 20px;">
     <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;">
@@ -840,6 +926,9 @@ st.markdown("""
     </p>
     <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 8px 0;">
         Enterprise Production Optimization Framework • Manual Logic Injected • Production Ready
+    </p>
+    <p style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 0.85rem; font-weight: 600; margin: 10px 0 0 0;">
+        ✨ Developed by Ovi | All Rights Reserved ✨
     </p>
 </div>
 """, unsafe_allow_html=True)
