@@ -1,5 +1,5 @@
 # app.py — PLATE RATIO SYSTEM V2 (6 Algorithms for Large Dataset)
-# Optimized for Large Datasets • Production Ready
+# Optimized for Large Datasets • Production Ready • No Shortfall Guaranteed
 # Design by Ovi
 
 import os
@@ -223,19 +223,43 @@ def calculate_waste_percent(plates: list, demand: dict) -> float:
     return round(max(0, (waste / total_produced) * 100), 2)
 
 
+# ================================================================
+# 🔥 CRITICAL FIX: SMART SHORTFALL PREVENTION ENGINE 🔥
+# ================================================================
 def ensure_demand_met(plates: list, demand: dict) -> list:
-    """Adjust sheets to ensure absolutely no shortfall across any size"""
-    if not plates: 
+    """Guarantees Total Produced QTY >= Demand for every single item without exception"""
+    if not plates or not demand: 
         return plates
     
+    # 1. Loop over each item to check for production shortages
     for tag in demand.keys():
         total_produced = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
+        
         if total_produced < demand[tag]:
             shortfall = demand[tag] - total_produced
-            last_plate = plates[-1]
-            ups = max(1, last_plate["layout"].get(tag, 1))
-            last_plate["sheets"] += ceil(shortfall / ups)
             
+            # Find the best plate that contains this item (highest UPS preferred)
+            best_plate = None
+            max_ups = 0
+            
+            for p in plates:
+                ups = p["layout"].get(tag, 0)
+                if ups > max_ups:
+                    max_ups = ups
+                    best_plate = p
+                    
+            # If item is found on a plate, increase sheets of that plate
+            if best_plate and max_ups > 0:
+                additional_sheets = ceil(shortfall / max_ups)
+                best_plate["sheets"] += additional_sheets
+            else:
+                # Emergency fallback: If the item has 0 UPS on all plates, force 1 UPS on the last plate
+                last_plate = plates[-1]
+                last_plate["layout"][tag] = 1
+                additional_sheets = ceil(shortfall / 1)
+                last_plate["sheets"] += additional_sheets
+
+    # 2. Recalculate full matrix data safely
     for p in plates:
         p["production"] = {tag: ups * p["sheets"] for tag, ups in p["layout"].items()}
         if "name" not in p:
@@ -692,7 +716,7 @@ def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> l
 
 
 # ================================================================
-# 🔥 UPGRADED ALGORITHM 6: Smart Clustering & Dynamic Phase Chunking Engine 🔥
+# ALGORITHM 6: Smart Clustering & Dynamic Phase Chunking Engine
 # ================================================================
 def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     """V6 - High-Efficiency Multi-Phase Dynamic Chunking Engine for extreme variance"""
@@ -705,32 +729,26 @@ def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int
         active = {k: v for k, v in remaining.items() if v > 0}
         if not active: break
         
-        # dynamic capacity ratio assignment
         sorted_active = sorted(active.items(), key=lambda x: x[1], reverse=True)
         total_active_qty = sum(active.values())
         
         layout = {}
-        # Phase 1: Heavy mathematical weight distribution
         for tag, qty in sorted_active:
             share = qty / total_active_qty
             allocated_ups = int(round(share * capacity))
             if qty > 0 and allocated_ups < 1:
-                # low volumes get space ONLY if we have remaining capacity
                 allocated_ups = 0
             layout[tag] = allocated_ups
             
-        # Capacity validation and balancing loops
         while sum(layout.values()) > capacity:
             max_tag = max(layout, key=lambda k: (layout[k], remaining[k]))
             if layout[max_tag] > 0: layout[max_tag] -= 1
             else: break
             
         while sum(layout.values()) < capacity:
-            # allocate remaining slots to high pressure/undisposed items
             max_pressure_tag = max(active.keys(), key=lambda k: remaining[k] / (layout.get(k, 0) + 1))
             layout[max_pressure_tag] = layout.get(max_pressure_tag, 0) + 1
             
-        # STEP 3: Critical Sheet Target Calculation to cut heavy overproduction
         valid_sheets = []
         for tag, ups in layout.items():
             if ups > 0:
@@ -739,11 +757,9 @@ def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int
         if not valid_sheets: break
         valid_sheets.sort()
         
-        # Pick the mathematical 25th percentile sheet to lock low volumes safely
         target_idx = min(int(len(valid_sheets) * 0.25), len(valid_sheets) - 1)
         sheets = max(1, valid_sheets[target_idx])
         
-        # Deduct accurately
         for tag, ups in layout.items():
             if ups > 0: remaining[tag] = max(0, remaining[tag] - (ups * sheets))
             
@@ -758,7 +774,7 @@ def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int
 
 
 # ================================================================
-# ALGORITHM 2: Global Multi-Plate Optimizer (V18) - Re-ordered to include V6
+# ALGORITHM 2: Global Multi-Plate Optimizer (V18)
 # ================================================================
 def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     candidates = []
