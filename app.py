@@ -169,18 +169,6 @@ st.markdown("""
     .stDataFrame { background: rgba(255,255,255,0.05); border-radius: 16px; padding: 0.5rem; }
     .warning { background: rgba(255,193,7,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #ffc107; color: #ffc107; margin: 1rem 0; }
     .info { background: rgba(23,162,184,0.1); padding: 12px; border-radius: 12px; border-left: 4px solid #17a2b8; color: #17a2b8; }
-    .algo-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin: 2px;
-    }
-    .algo-badge.gold { background: #ffd700; color: #000; }
-    .algo-badge.silver { background: #c0c0c0; color: #000; }
-    .algo-badge.bronze { background: #cd7f32; color: #fff; }
-    .algo-badge.normal { background: rgba(102,126,234,0.3); color: #fff; }
     #MainMenu, header, footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
@@ -299,199 +287,64 @@ def build_full_summary(plates: list, demand: dict, original_qty: dict) -> pd.Dat
 
 def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
                         algo_name: str, waste_percent: float,
-                        styles_dict: dict = None, colors_dict: dict = None, 
-                        sizes_dict: dict = None, job_number: str = "") -> BytesIO | None:
-    """Generate professional PDF report with Style, Color, Size columns and Job Number"""
-    try:
-        from reportlab.lib import colors
-        from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-    except ImportError:
+                        styles_dict: dict, colors_dict: dict, sizes_dict: dict, 
+                        job_number: str) -> BytesIO or None:
+    """Generate official ReportLab PDF documentation"""
+    if not REPORTLAB_AVAILABLE: 
         return None
-
-    # Initialize empty dicts if not provided
-    if styles_dict is None:
-        styles_dict = {}
-    if colors_dict is None:
-        colors_dict = {}
-    if sizes_dict is None:
-        sizes_dict = {}
-
     try:
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, pagesize=landscape(A4),
-            rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
-        )
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
         styles = getSampleStyleSheet()
 
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle', parent=styles['Heading1'],
-            fontSize=14, alignment=TA_CENTER, 
-            textColor=colors.HexColor('#667eea'),
-            spaceAfter=4
-        )
-        job_style = ParagraphStyle(
-            'JobStyle', parent=styles['Heading2'],
-            fontSize=12, alignment=TA_CENTER,
-            textColor=colors.HexColor('#764ba2'),
-            spaceAfter=8
-        )
-        subtitle_style = ParagraphStyle(
-            'CustomSubtitle', parent=styles['Normal'],
-            fontSize=9, alignment=TA_CENTER, 
-            textColor=colors.grey,
-            spaceAfter=12
-        )
-        footer_style = ParagraphStyle(
-            'Footer', parent=styles['Normal'],
-            fontSize=8, alignment=TA_CENTER, 
-            textColor=colors.grey,
-            spaceTop=12
-        )
+        title_style = ParagraphStyle('T1', parent=styles['Heading1'], fontSize=14, alignment=TA_CENTER, textColor=colors.HexColor('#667eea'))
+        job_style = ParagraphStyle('T2', parent=styles['Heading2'], fontSize=12, alignment=TA_CENTER, textColor=colors.HexColor('#764ba2'))
+        sub_style = ParagraphStyle('T3', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER, textColor=colors.grey)
 
-        story = []
-        
-        # Header with Job Number
-        story.append(Paragraph("📊 Plate Ratio System - Ratio Report", title_style))
-        if job_number:
-            story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
-        story.append(Paragraph(
-            f"Algorithm: {algo_name} | Waste: {waste_percent}% | "
-            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            subtitle_style
-        ))
-        story.append(Spacer(1, 10))
+        story = [
+            Paragraph("📊 Plate Ratio System V2 - Layout Report", title_style),
+            Paragraph(f"🔢 Job Number: {job_number}", job_style),
+            Paragraph(f"Engine: {algo_name} | Total Waste: {waste_percent}% | Run Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", sub_style),
+            Spacer(1, 15)
+        ]
 
-        # ============= MAIN SUMMARY TABLE =============
-        # Build header with all columns
-        header_row = ["SL", "Style", "Color", "Size", "Original", "With Add-on"]
-        for p in plates:
-            header_row.append(f"Plate {p['name']}")
-        header_row.extend(["Total Prod.", "Excess", "Excess %"])
+        header = ["SL", "Style", "Color", "Size", "Original", "Target"]
+        for p in plates: 
+            header.append(f"Plate {p['name']}")
+        header.extend(["Total Prod", "Excess", "Excess %"])
         
-        summary_data = [header_row]
-        
-        # Build data rows
+        table_data = [header]
         sl = 1
         for tag in demand.keys():
-            # Get style/color/size from session state or use defaults
-            style = styles_dict.get(tag, "")
-            color = colors_dict.get(tag, "")
-            size = sizes_dict.get(tag, "")
-            
-            row = [str(sl), style, color, size, 
-                   str(original_qty.get(tag, 0)), str(demand[tag])]
-            
-            total_produced = 0
+            row = [
+                str(sl), styles_dict.get(tag, "N/A"), colors_dict.get(tag, "N/A"), sizes_dict.get(tag, "N/A"),
+                str(original_qty.get(tag, 0)), str(demand[tag])
+            ]
             for p in plates:
-                ups = p["layout"].get(tag, 0)
-                row.append(str(ups))
-                total_produced += ups * p["sheets"]
-            
-            excess = total_produced - demand[tag]
-            excess_percent = f"{round((excess / demand[tag]) * 100, 2) if demand[tag] else 0}%"
-            row.extend([str(total_produced), str(excess), excess_percent])
-            summary_data.append(row)
+                row.append(str(p["layout"].get(tag, 0)))
+                
+            total_prod = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
+            excess = total_prod - demand[tag]
+            row.extend([str(total_prod), str(excess), f"{round((excess/demand[tag])*100,1) if demand[tag] else 0}%"])
+            table_data.append(row)
             sl += 1
-        
-        # Total row
-        total_row = ["📊", "TOTAL", "", "", 
-                     str(sum(original_qty.values())), str(sum(demand.values()))]
-        
-        total_produced_sum = 0
-        for p in plates:
-            plate_total = 0
-            for tag in demand:
-                plate_total += p["layout"].get(tag, 0) * p["sheets"]
-            total_row.append(str(plate_total))
-            total_produced_sum += plate_total
-        
-        total_excess_sum = total_produced_sum - sum(demand.values())
-        total_excess_percent = (
-            f"{round((total_excess_sum / total_produced_sum) * 100, 2) if total_produced_sum > 0 else 0}%"
-        )
-        total_row.extend([str(total_produced_sum), str(total_excess_sum), total_excess_percent])
-        summary_data.append(total_row)
-        
-        # Create main table
-        main_table = Table(summary_data, repeatRows=1)
-        
-        # Style the table
-        table_style = [
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 7),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -2), 6),
-            ('ALIGN', (0, 1), (-1, -2), 'CENTER'),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, -1), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]
-        
-        # Apply alternating row colors
-        for i in range(1, len(summary_data) - 1):
-            if i % 2 == 0:
-                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f8f9fa')))
-        
-        main_table.setStyle(TableStyle(table_style))
-        story.append(main_table)
-        story.append(Spacer(1, 15))
-        
-        # ============= PLATE DETAILS TABLE =============
-        story.append(Paragraph("🧾 Plate Configuration Details", 
-                              ParagraphStyle('SubHeader', parent=styles['Heading2'],
-                                           fontSize=11, alignment=TA_CENTER,
-                                           textColor=colors.HexColor('#667eea'))))
-        story.append(Spacer(1, 8))
-        
-        plate_data = [["SL", "Plate ID", "Sheets", "Total UPS"]]
-        for idx, p in enumerate(plates, 1):
-            plate_data.append([
-                str(idx), 
-                p["name"], 
-                str(p["sheets"]), 
-                str(sum(p["layout"].values()))
-            ])
-        
-        plate_table = Table(plate_data)
-        plate_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 7),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            
+        t = Table(table_data, repeatRows=1)
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ]))
-        
-        story.append(plate_table)
-        story.append(Spacer(1, 15))
-        
-        # ============= FOOTER =============
-        story.append(Paragraph(
-            f"This Report Generated by Ovi's Plate Ratio System | Job: {job_number if job_number else 'N/A'} | All Rights Reserved",
-            footer_style
-        ))
-        
-        # Build the PDF
+        story.append(t)
         doc.build(story)
         buffer.seek(0)
         return buffer
-
-    except Exception as e:
-        print(f"PDF Generation Error: {str(e)}")
+    except Exception:
         return None
+
 
 # ================================================================
 # UNIVERSAL LAYOUT GENERATOR
@@ -601,56 +454,10 @@ def create_valid_layout(active: dict, capacity: int, method: str = "balanced") -
 
 
 # ================================================================
-# 5 ALGORITHMS FOR LARGE DATASET
+# ALGORITHM 1: Multi-Variation Optimizer (V4)
 # ================================================================
-
-# ================================================================
-# ALGORITHM 1: Base Ratio System (Fixed - Uses max_plates)
-# ================================================================
-def v1_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    """V1 - Base Ratio System (Now uses max_plates)"""
-    total = sum(demand.values())
-    if total == 0:
-        return []
-    
-    remaining = demand.copy()
-    plates = []
-    
-    for i in range(max_plates):
-        active = {k: v for k, v in remaining.items() if v > 0}
-        if not active:
-            break
-        
-        layout = create_valid_layout(active, capacity, "balanced")
-        sheets = ceil(sum(active.values()) / capacity)
-        
-        for tag, ups in layout.items():
-            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
-        
-        plates.append({
-            "name": plate_name(i + 1),
-            "layout": layout,
-            "sheets": sheets,
-            "plate_index": i + 1
-        })
-    
-    if any(v > 0 for v in remaining.values()) and plates:
-        last = plates[-1]
-        for tag in remaining:
-            if remaining[tag] > 0:
-                ups = max(1, last["layout"].get(tag, 1))
-                additional = ceil(remaining[tag] / ups)
-                last["sheets"] += additional
-                remaining[tag] = 0
-    
-    return ensure_demand_met(plates, demand)
-
-
-# ================================================================
-# ALGORITHM 2: Multi-Variation Optimizer
-# ================================================================
-def v4_multi_variation_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    """V4 - Multi-Variation Optimizer (Best for large datasets)"""
+def algo_multi_variation_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """V1 - Multi-Variation Optimizer (Best for large datasets)"""
     best_score = 999999
     best_plates = None
     
@@ -701,14 +508,45 @@ def v4_multi_variation_optimizer(demand: dict, capacity: int, max_plates: int) -
             best_score = waste_percent
             best_plates = plates
 
-    return ensure_demand_met(best_plates, demand) if best_plates else v1_base_ratio_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_plates, demand) if best_plates else None
 
 
 # ================================================================
-# ALGORITHM 3: AI Mutation Engine
+# ALGORITHM 2: Global Multi-Plate Optimizer (V18)
 # ================================================================
-def v5_ai_mutation_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
-    """V5 - AI Mutation Engine (Random mutation for optimization)"""
+def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """V2 - Global Multi-Plate Optimizer (Best of all)"""
+    candidates = []
+    
+    # Use all other algorithms as candidates
+    algos = [
+        algo_multi_variation_optimizer,
+        algo_ai_mutation_optimizer,
+        algo_ai_evolution_optimizer,
+        algo_base_ratio_optimizer
+    ]
+
+    for algo in algos:
+        try:
+            result = algo(demand, capacity, max_plates)
+            if result:
+                waste = calculate_waste_percent(result, demand)
+                candidates.append((waste, result))
+        except:
+            pass
+
+    if not candidates:
+        return algo_base_ratio_optimizer(demand, capacity, max_plates)
+
+    candidates.sort(key=lambda x: x[0])
+    return ensure_demand_met(candidates[0][1], demand)
+
+
+# ================================================================
+# ALGORITHM 3: AI Mutation Engine (V5)
+# ================================================================
+def algo_ai_mutation_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
+    """V3 - AI Mutation Engine (Random mutation for optimization)"""
     best_score = 999999
     best_plates = None
 
@@ -758,20 +596,28 @@ def v5_ai_mutation_optimizer(demand: dict, capacity: int, max_plates: int, itera
             best_score = waste_percent
             best_plates = copy.deepcopy(plates)
 
-    return ensure_demand_met(best_plates, demand) if best_plates else v1_base_ratio_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_plates, demand) if best_plates else None
 
 
 # ================================================================
-# ALGORITHM 4: AI Evolution Engine
+# ALGORITHM 4: AI Evolution Engine (V17)
 # ================================================================
-def v17_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 100) -> list:
-    """V17 - AI Evolution Engine (Genetic Algorithm)"""
+def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 100) -> list:
+    """V4 - AI Evolution Engine (Genetic Algorithm)"""
     population = []
-    available_algos = [v1_base_ratio_optimizer, v5_ai_mutation_optimizer, v4_multi_variation_optimizer]
+    available_algos = [
+        algo_base_ratio_optimizer,
+        algo_ai_mutation_optimizer,
+        algo_multi_variation_optimizer
+    ]
     
     for _ in range(20):
         candidate = random.choice(available_algos)(demand, capacity, max_plates)
-        population.append(candidate)
+        if candidate:
+            population.append(candidate)
+
+    if not population:
+        return algo_base_ratio_optimizer(demand, capacity, max_plates)
 
     best_solution = None
     best_waste = 999999
@@ -780,12 +626,16 @@ def v17_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, gen
         scored = []
 
         for sol in population:
-            waste = calculate_waste_percent(sol, demand)
-            scored.append((waste, sol))
+            if sol:
+                waste = calculate_waste_percent(sol, demand)
+                scored.append((waste, sol))
 
-            if waste < best_waste:
-                best_waste = waste
-                best_solution = copy.deepcopy(sol)
+                if waste < best_waste:
+                    best_waste = waste
+                    best_solution = copy.deepcopy(sol)
+
+        if not scored:
+            continue
 
         scored.sort(key=lambda x: x[0])
         elites = [copy.deepcopy(x[1]) for x in scored[:5]]
@@ -812,36 +662,49 @@ def v17_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, gen
 
         population = new_population
 
-    return ensure_demand_met(best_solution, demand) if best_solution else v1_base_ratio_optimizer(demand, capacity, max_plates)
+    return ensure_demand_met(best_solution, demand) if best_solution else algo_base_ratio_optimizer(demand, capacity, max_plates)
 
 
 # ================================================================
-# ALGORITHM 5: Global Multi-Plate Optimizer
+# ALGORITHM 5: Base Ratio System (V1 - Fixed)
 # ================================================================
-def v18_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    """V18 - Global Multi-Plate Optimizer (Best of all)"""
-    candidates = []
-    algos = [
-        v1_base_ratio_optimizer, 
-        v4_multi_variation_optimizer, 
-        v5_ai_mutation_optimizer, 
-        v17_ai_evolution_optimizer
-    ]
-
-    for algo in algos:
-        try:
-            result = algo(demand, capacity, max_plates)
-            if result:
-                waste = calculate_waste_percent(result, demand)
-                candidates.append((waste, result))
-        except:
-            pass
-
-    if not candidates:
-        return v1_base_ratio_optimizer(demand, capacity, max_plates)
-
-    candidates.sort(key=lambda x: x[0])
-    return ensure_demand_met(candidates[0][1], demand)
+def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """V5 - Base Ratio System (Now uses max_plates)"""
+    total = sum(demand.values())
+    if total == 0:
+        return []
+    
+    remaining = demand.copy()
+    plates = []
+    
+    for i in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        layout = create_valid_layout(active, capacity, "balanced")
+        sheets = ceil(sum(active.values()) / capacity)
+        
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        plates.append({
+            "name": plate_name(i + 1),
+            "layout": layout,
+            "sheets": sheets,
+            "plate_index": i + 1
+        })
+    
+    if any(v > 0 for v in remaining.values()) and plates:
+        last = plates[-1]
+        for tag in remaining:
+            if remaining[tag] > 0:
+                ups = max(1, last["layout"].get(tag, 1))
+                additional = ceil(remaining[tag] / ups)
+                last["sheets"] += additional
+                remaining[tag] = 0
+    
+    return ensure_demand_met(plates, demand)
 
 
 # ================================================================
@@ -1104,11 +967,11 @@ if generate_clicked:
         
         # ================== 5 ALGORITHMS ==================
         algo_functions = {
-            "V1 - Base Ratio System": lambda: v1_base_ratio_optimizer(demand, cap, maxp),
-            "V4 - Multi-Variation Optimizer": lambda: v4_multi_variation_optimizer(demand, cap, maxp),
-            "V5 - AI Mutation Engine": lambda: v5_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
-            "V17 - AI Evolution Engine": lambda: v17_ai_evolution_optimizer(demand, cap, maxp, generations=100),
-            "V18 - Global Multi-Plate Optimizer": lambda: v18_global_optimizer(demand, cap, maxp),
+            "V1 - Multi-Variation Optimizer": lambda: algo_multi_variation_optimizer(demand, cap, maxp),
+            "V2 - Global Multi-Plate Optimizer": lambda: algo_global_optimizer(demand, cap, maxp),
+            "V3 - AI Mutation Engine": lambda: algo_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
+            "V4 - AI Evolution Engine": lambda: algo_ai_evolution_optimizer(demand, cap, maxp, generations=100),
+            "V5 - Base Ratio System": lambda: algo_base_ratio_optimizer(demand, cap, maxp),
         }
         
         # Run all algorithms with progress bar
@@ -1121,7 +984,7 @@ if generate_clicked:
             try:
                 results[algo_name] = func()
             except Exception as e:
-                results[algo_name] = v1_base_ratio_optimizer(demand, cap, maxp)
+                results[algo_name] = algo_base_ratio_optimizer(demand, cap, maxp)
             
             progress_bar.progress((idx + 1) / len(algo_functions))
         
@@ -1133,7 +996,7 @@ if generate_clicked:
             if plates:
                 results[algo_name] = ensure_demand_met(plates, demand)
             else:
-                results[algo_name] = v1_base_ratio_optimizer(demand, cap, maxp)
+                results[algo_name] = algo_base_ratio_optimizer(demand, cap, maxp)
         
         # Comparison Data
         comparison_data = []
@@ -1281,98 +1144,86 @@ if generate_clicked:
                 st.error(f"Error generating report: {str(e)}")
                 st.info("Showing comparison table instead...")
         
-  # ================================================================
-# VIEW INDIVIDUAL ALGORITHM REPORT - FIXED
-# ================================================================
+        # ============= ALGORITHM COMPARISON =============
+        st.markdown("---")
+        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
+        
+        styled_df = comparison_df.style.apply(
+            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
+            if row["Algorithm"] == best_algo else [''] * len(row),
+            axis=1
+        ).format({"Waste %": "{:.2f}%"})
+        
+        st.dataframe(styled_df, use_container_width=True, height=400)
 
-st.markdown("---")
-st.markdown("## 🔍 View Individual Algorithm Report")
+        # ============= VIEW ANY ALGORITHM REPORT =============
+        st.markdown("---")
+        st.markdown("## 🔍 View Individual Algorithm Report")
 
-# ✅ Check if results exist in session state
-if 'results' in st.session_state and st.session_state['results']:
-    
-    # ✅ Get algorithm list
-    algo_list = list(st.session_state['results'].keys())
-    
-    if algo_list:
-        # ✅ Set default index to best algorithm
-        default_index = 0
-        if st.session_state.get('best_algo') in algo_list:
-            default_index = algo_list.index(st.session_state['best_algo'])
-        
-        # ✅ Create two columns: selector and button
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            selected_algo = st.selectbox(
-                "Select Algorithm to View Report:",
-                options=algo_list,
-                index=default_index,
-                key="independent_algo_selector"
-            )
-        
-        with col2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            view_button = st.button("📋 View Report", use_container_width=True, type="primary")
-        
-        # ✅ When view button is clicked
-        if view_button:
-            selected_plates = st.session_state['results'].get(selected_algo)
+        if 'results' in st.session_state and st.session_state['results']:
+            algo_list = list(st.session_state['results'].keys())
             
-            if selected_plates:
-                st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
-                
-                # ✅ Build summary DataFrame
-                full_df = build_full_summary(
-                    selected_plates, 
-                    st.session_state.get('demand', {}), 
-                    st.session_state.get('original_qty', {})
+            default_index = 0
+            if st.session_state.get('best_algo') in algo_list:
+                default_index = algo_list.index(st.session_state['best_algo'])
+
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                selected_algo = st.selectbox(
+                    "Select Algorithm to View Report:",
+                    options=algo_list,
+                    index=default_index,
+                    key="independent_algo_selector"
                 )
+
+            with col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                view_button = st.button("📋 View Report", use_container_width=True, type="primary")
+
+            if view_button:
+                selected_plates = st.session_state['results'].get(selected_algo)
                 
-                if not full_df.empty:
+                if selected_plates:
+                    st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
+                    
+                    full_df = build_full_summary(
+                        selected_plates, 
+                        st.session_state['demand'], 
+                        st.session_state['original_qty']
+                    )
                     st.dataframe(full_df, use_container_width=True, height=400)
-                else:
-                    st.warning("⚠️ No data to display")
-                
-                # ✅ Plate Configuration Details
-                st.markdown("### 🧾 Plate Configuration Details")
-                plate_rows = []
-                total_sheets = 0
-                total_ups = 0
-                
-                for idx, p in enumerate(selected_plates, 1):
-                    ups_sum = sum(p["layout"].values())
+
+                    st.markdown("### 🧾 Plate Configuration Details")
+                    plate_rows = []
+                    total_sheets = 0
+                    total_ups = 0
+                    
+                    for idx, p in enumerate(selected_plates, 1):
+                        ups_sum = sum(p["layout"].values())
+                        plate_rows.append({
+                            "SL": idx,
+                            "Plate ID": p.get("name", f"Plate {idx}"),
+                            "Sheets Required": p.get("sheets", 0),
+                            "Total UPS": ups_sum,
+                        })
+                        total_sheets += p.get("sheets", 0)
+                        total_ups += ups_sum
+
                     plate_rows.append({
-                        "SL": idx,
-                        "Plate ID": p.get("name", f"Plate {idx}"),
-                        "Sheets Required": p.get("sheets", 0),
-                        "Total UPS": ups_sum,
+                        "SL": "📊",
+                        "Plate ID": "TOTAL",
+                        "Sheets Required": total_sheets,
+                        "Total UPS": total_ups,
                     })
-                    total_sheets += p.get("sheets", 0)
-                    total_ups += ups_sum
-                
-                # ✅ Add total row
-                plate_rows.append({
-                    "SL": "📊",
-                    "Plate ID": "TOTAL",
-                    "Sheets Required": total_sheets,
-                    "Total UPS": total_ups,
-                })
-                
-                plate_df = pd.DataFrame(plate_rows)
-                st.dataframe(plate_df, use_container_width=True)
-                
-                # ✅ Waste and metrics
-                waste = calculate_waste_percent(selected_plates, st.session_state.get('demand', {}))
-                st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
-                
-            else:
-                st.error(f"❌ Report not found for {selected_algo}")
-    else:
-        st.warning("⚠️ No algorithms found in results.")
-else:
-    st.info("ℹ️ Please generate the optimization first to view individual algorithm reports.")
-    st.info("💡 Click 'Generate' button above to run all algorithms.")
+
+                    plate_df = pd.DataFrame(plate_rows)
+                    st.dataframe(plate_df, use_container_width=True)
+
+                    waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
+                    st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+
+                else:
+                    st.error(f"❌ Report not found for {selected_algo}")
 
 # ================================================================
 # FOOTER
