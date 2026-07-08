@@ -2493,7 +2493,9 @@ if input_mode == "✏️ Manual Input":
     st.session_state['item_colors'] = {f"Item {i+1}": colors[i] for i in range(n)}
     st.session_state['item_sizes'] = {f"Item {i+1}": sizes[i] for i in range(n)}
 
-# ================== EXCEL FILE UPLOAD ==================
+# ================================================================
+# EXCEL FILE UPLOAD - COMPLETE FIXED WITH SAFE INDEXING
+# ================================================================
 else:
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
     
@@ -2508,103 +2510,111 @@ else:
             df = pd.read_excel(uploaded_file)
             df = df.dropna(how='all')
             
+            if df.empty:
+                st.warning("⚠️ The file is empty or contains no data.")
+                st.stop()
+            
+            columns_list = list(df.columns)
+            st.success(f"✅ File loaded! Found {len(columns_list)} columns.")
+            st.dataframe(df.head(5), use_container_width=True)
+            
+            # Auto-detect columns
             style_col = None
             color_col = None
             size_col = None
             qty_col = None
-            sl_col = None
             
-            for col in df.columns:
+            # Try to find columns by name
+            for col in columns_list:
                 col_lower = str(col).lower().strip()
-                if col_lower in ['style', 'styles']:
+                if col_lower in ['style', 'styles', 'product', 'products', 'item']:
                     style_col = col
                 elif col_lower in ['color', 'colors', 'colour']:
                     color_col = col
                 elif col_lower in ['size', 'sizes']:
                     size_col = col
-                elif col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total']:
+                elif col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total', 'order']:
                     qty_col = col
-                elif col_lower in ['sl', 's/l', 'serial', 'serial no', 'serial no.', 'no']:
-                    sl_col = col
             
-            if qty_col is None and len(df.columns) >= 2:
-                for col in df.columns:
-                    if df[col].dtype in ['int64', 'float64']:
-                        qty_col = col
-                        break
+            # If not found, let user select
+            if not style_col or not color_col or not size_col or not qty_col:
+                st.info("🔍 Please select the correct columns from your Excel file:")
+                
+                c1, c2, c3, c4 = st.columns(4)
+                
+                # ✅ Safe index handling with len() check
+                with c1:
+                    style_col = st.selectbox("🎨 Style Column", columns_list, index=0)
+                with c2:
+                    color_col = st.selectbox("🌈 Color Column", columns_list, index=min(1, len(columns_list)-1))
+                with c3:
+                    size_col = st.selectbox("📏 Size Column", columns_list, index=min(2, len(columns_list)-1))
+                with c4:
+                    qty_col = st.selectbox("📊 Quantity Column", columns_list, index=min(3, len(columns_list)-1))
             
-            if qty_col is None and len(df.columns) >= 2:
-                qty_col = df.columns[-1]
+            # Process data
+            tags = []
+            styles = []
+            colors = []
+            sizes = []
+            qty = []
             
-            if style_col is None:
-                style_col = df.columns[1] if len(df.columns) >= 2 else None
-            if color_col is None:
-                color_col = df.columns[2] if len(df.columns) >= 3 else None
-            if size_col is None:
-                size_col = df.columns[3] if len(df.columns) >= 4 else None
-            
-            if qty_col is None:
-                st.error("❌ Could not find 'Quantity' column. Please ensure your file has a quantity column.")
-                st.stop()
-            
-            style_data = df[style_col].astype(str).tolist() if style_col else ["N/A"] * len(df)
-            color_data = df[color_col].astype(str).tolist() if color_col else ["N/A"] * len(df)
-            size_data = df[size_col].astype(str).tolist() if size_col else ["N/A"] * len(df)
-            qty_data = df[qty_col].tolist()
-            
-            cleaned_data = []
-            for idx, (style, color, size, qty) in enumerate(zip(style_data, color_data, size_data, qty_data)):
-                if pd.isna(qty):
+            for idx, row in df.iterrows():
+                if row.isnull().all():
                     continue
+                
+                style_val = str(row.get(style_col, '')).strip() if pd.notnull(row.get(style_col)) else "N/A"
+                color_val = str(row.get(color_col, '')).strip() if pd.notnull(row.get(color_col)) else "N/A"
+                size_val = str(row.get(size_col, '')).strip() if pd.notnull(row.get(size_col)) else "N/A"
+                
+                qty_raw = row.get(qty_col, 0)
+                if pd.isnull(qty_raw):
+                    continue
+                
                 try:
-                    qty_int = int(float(qty))
-                    if qty_int > 0:
-                        style_val = str(style).strip() if not pd.isna(style) and str(style).strip() != '' else "N/A"
-                        color_val = str(color).strip() if not pd.isna(color) and str(color).strip() != '' else "N/A"
-                        size_val = str(size).strip() if not pd.isna(size) and str(size).strip() != '' else "N/A"
-                        cleaned_data.append((style_val, color_val, size_val, qty_int))
+                    q_val = int(float(qty_raw))
                 except (ValueError, TypeError):
                     continue
+                
+                if q_val > 0:
+                    tag = f"Item_{idx+1}_{style_val}_{size_val}"
+                    tags.append(tag)
+                    styles.append(style_val if style_val else "N/A")
+                    colors.append(color_val if color_val else "N/A")
+                    sizes.append(size_val if size_val else "N/A")
+                    qty.append(q_val)
             
-            if not cleaned_data:
-                st.error("❌ No valid data found in the file. Please check the format.")
-                st.stop()
-            
-            style_list = [item[1] for item in cleaned_data]
-            color_list = [item[2] for item in cleaned_data]
-            size_list = [item[3] for item in cleaned_data]
-            qty_list = [item[4] for item in cleaned_data]
-            
-            preview_df = pd.DataFrame({
-                "Style": style_list,
-                "Color": color_list,
-                "Size": size_list,
-                "Quantity": qty_list
-            })
-            
-            st.success(f"✅ File loaded successfully! {len(cleaned_data)} valid items found.")
-            st.dataframe(preview_df, use_container_width=True)
-            
-            n = len(cleaned_data)
-            tags = [f"Item {i+1}" for i in range(n)]
-            qty = qty_list
-            
-            st.session_state['item_styles'] = {f"Item {i+1}": style_list[i] for i in range(n)}
-            st.session_state['item_colors'] = {f"Item {i+1}": color_list[i] for i in range(n)}
-            st.session_state['item_sizes'] = {f"Item {i+1}": size_list[i] for i in range(n)}
-            
-            original_qty = {t: int(q) for t, q in zip(tags, qty) if q > 0}
-            demand = {t: ceil(int(q) * (1 + addon / 100)) for t, q in zip(tags, qty) if q > 0}
-            
+            if tags:
+                st.success(f"✅ Successfully loaded {len(tags)} items from Excel!")
+                
+                preview_df = pd.DataFrame({
+                    "Style": styles[:10],
+                    "Color": colors[:10],
+                    "Size": sizes[:10],
+                    "Quantity": qty[:10]
+                })
+                st.dataframe(preview_df, use_container_width=True)
+                
+                # Store in session state
+                st.session_state['item_styles'] = {tags[i]: styles[i] for i in range(len(tags))}
+                st.session_state['item_colors'] = {tags[i]: colors[i] for i in range(len(tags))}
+                st.session_state['item_sizes'] = {tags[i]: sizes[i] for i in range(len(tags))}
+                st.session_state['excel_tags'] = tags
+                st.session_state['excel_qty'] = qty
+                st.session_state['excel_loaded'] = True
+                
+            else:
+                st.warning("⚠️ No valid data found. Please check your Excel file format.")
+                st.info("💡 Expected format: Columns with headers like 'Style', 'Color', 'Size', 'Quantity'")
+                
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
-            st.stop()
+            st.info("💡 Make sure your Excel file has columns: Style, Color, Size, Quantity")
     else:
         st.info("📤 Please upload an Excel file to continue.")
         st.stop()
-
-st.markdown('</div>', unsafe_allow_html=True)
-
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 # ================== WARNING MESSAGES ==================
 if not PULP_AVAILABLE:
     st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
