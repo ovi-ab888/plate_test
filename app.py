@@ -299,245 +299,200 @@ def build_full_summary(plates: list, demand: dict, original_qty: dict) -> pd.Dat
 
 def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
                         algo_name: str, waste_percent: float,
-                        styles_dict: dict, colors_dict: dict, sizes_dict: dict, 
-                        job_number: str) -> BytesIO or None:
-    """Generate official ReportLab PDF documentation with Plate Details"""
-    
+                        styles_dict: dict = None, colors_dict: dict = None, 
+                        sizes_dict: dict = None, job_number: str = "") -> BytesIO | None:
+    """Generate professional PDF report with Style, Color, Size columns and Job Number"""
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
     except ImportError:
-        st.warning("⚠️ reportlab not installed. Install with: pip install reportlab")
         return None
-    
+
+    # Initialize empty dicts if not provided
+    if styles_dict is None:
+        styles_dict = {}
+    if colors_dict is None:
+        colors_dict = {}
+    if sizes_dict is None:
+        sizes_dict = {}
+
     try:
         buffer = BytesIO()
         doc = SimpleDocTemplate(
-            buffer, 
-            pagesize=landscape(A4), 
-            rightMargin=20, 
-            leftMargin=20, 
-            topMargin=20, 
-            bottomMargin=20
+            buffer, pagesize=landscape(A4),
+            rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20
         )
         styles = getSampleStyleSheet()
 
-        # ✅ Custom Styles
+        # Custom styles
         title_style = ParagraphStyle(
-            'T1', 
-            parent=styles['Heading1'], 
-            fontSize=14, 
-            alignment=TA_CENTER, 
+            'CustomTitle', parent=styles['Heading1'],
+            fontSize=14, alignment=TA_CENTER, 
             textColor=colors.HexColor('#667eea'),
-            spaceAfter=8
+            spaceAfter=4
         )
         job_style = ParagraphStyle(
-            'T2', 
-            parent=styles['Heading2'], 
-            fontSize=12, 
-            alignment=TA_CENTER, 
+            'JobStyle', parent=styles['Heading2'],
+            fontSize=12, alignment=TA_CENTER,
             textColor=colors.HexColor('#764ba2'),
-            spaceAfter=6
+            spaceAfter=8
         )
-        sub_style = ParagraphStyle(
-            'T3', 
-            parent=styles['Normal'], 
-            fontSize=9, 
-            alignment=TA_CENTER, 
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle', parent=styles['Normal'],
+            fontSize=9, alignment=TA_CENTER, 
             textColor=colors.grey,
             spaceAfter=12
         )
-        section_style = ParagraphStyle(
-            'Section', 
-            parent=styles['Heading2'], 
-            fontSize=11, 
-            alignment=TA_CENTER, 
-            textColor=colors.HexColor('#667eea'),
-            spaceAfter=8,
-            spaceBefore=12
-        )
         footer_style = ParagraphStyle(
-            'T4', 
-            parent=styles['Normal'], 
-            fontSize=8, 
-            alignment=TA_CENTER, 
+            'Footer', parent=styles['Normal'],
+            fontSize=8, alignment=TA_CENTER, 
             textColor=colors.grey,
             spaceTop=12
         )
 
         story = []
         
-        # ============================================================
-        # SECTION 1: HEADER
-        # ============================================================
-        story.append(Paragraph("📊 Plate Ratio System V2 - Layout Report", title_style))
-        story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
+        # Header with Job Number
+        story.append(Paragraph("📊 Plate Ratio System - Ratio Report", title_style))
+        if job_number:
+            story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
         story.append(Paragraph(
-            f"Engine: {algo_name} | Total Waste: {waste_percent}% | "
-            f"Run Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
-            sub_style
+            f"Algorithm: {algo_name} | Waste: {waste_percent}% | "
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            subtitle_style
         ))
         story.append(Spacer(1, 10))
 
-        # ============================================================
-        # SECTION 2: MAIN SUMMARY TABLE
-        # ============================================================
-        story.append(Paragraph("📊 Production Summary", section_style))
-        story.append(Spacer(1, 5))
-
-        header = ["SL", "Style", "Color", "Size", "Original", "Target"]
-        for p in plates: 
-            header.append(f"Plate {p['name']}")
-        header.extend(["Total Prod", "Excess", "Excess %"])
+        # ============= MAIN SUMMARY TABLE =============
+        # Build header with all columns
+        header_row = ["SL", "Style", "Color", "Size", "Original", "With Add-on"]
+        for p in plates:
+            header_row.append(f"Plate {p['name']}")
+        header_row.extend(["Total Prod.", "Excess", "Excess %"])
         
-        table_data = [header]
+        summary_data = [header_row]
         
+        # Build data rows
         sl = 1
         for tag in demand.keys():
-            style = str(styles_dict.get(tag, "N/A"))[:20]
-            color = str(colors_dict.get(tag, "N/A"))[:20]
-            size = str(sizes_dict.get(tag, "N/A"))[:20]
+            # Get style/color/size from session state or use defaults
+            style = styles_dict.get(tag, "")
+            color = colors_dict.get(tag, "")
+            size = sizes_dict.get(tag, "")
             
-            row = [
-                str(sl), style, color, size,
-                str(original_qty.get(tag, 0)), str(demand[tag])
-            ]
+            row = [str(sl), style, color, size, 
+                   str(original_qty.get(tag, 0)), str(demand[tag])]
             
+            total_produced = 0
             for p in plates:
-                row.append(str(p["layout"].get(tag, 0)))
-                
-            total_prod = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
-            excess = total_prod - demand[tag]
-            excess_pct = f"{round((excess/demand[tag])*100, 1) if demand[tag] else 0}%"
-            row.extend([str(total_prod), str(excess), excess_pct])
-            table_data.append(row)
+                ups = p["layout"].get(tag, 0)
+                row.append(str(ups))
+                total_produced += ups * p["sheets"]
+            
+            excess = total_produced - demand[tag]
+            excess_percent = f"{round((excess / demand[tag]) * 100, 2) if demand[tag] else 0}%"
+            row.extend([str(total_produced), str(excess), excess_percent])
+            summary_data.append(row)
             sl += 1
         
         # Total row
         total_row = ["📊", "TOTAL", "", "", 
                      str(sum(original_qty.values())), str(sum(demand.values()))]
         
-        total_prod_sum = 0
+        total_produced_sum = 0
         for p in plates:
-            plate_total = sum(p["layout"].get(tag, 0) * p["sheets"] for tag in demand)
+            plate_total = 0
+            for tag in demand:
+                plate_total += p["layout"].get(tag, 0) * p["sheets"]
             total_row.append(str(plate_total))
-            total_prod_sum += plate_total
+            total_produced_sum += plate_total
         
-        total_excess = total_prod_sum - sum(demand.values())
-        total_excess_pct = f"{round((total_excess / total_prod_sum) * 100, 2) if total_prod_sum > 0 else 0}%"
-        total_row.extend([str(total_prod_sum), str(total_excess), total_excess_pct])
-        table_data.append(total_row)
+        total_excess_sum = total_produced_sum - sum(demand.values())
+        total_excess_percent = (
+            f"{round((total_excess_sum / total_produced_sum) * 100, 2) if total_produced_sum > 0 else 0}%"
+        )
+        total_row.extend([str(total_produced_sum), str(total_excess_sum), total_excess_percent])
+        summary_data.append(total_row)
         
         # Create main table
-        t = Table(table_data, repeatRows=1)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-            ('FONTSIZE', (0,0), (-1,-1), 6),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ]))
-        story.append(t)
-        story.append(Spacer(1, 15))
-
-        # ============================================================
-        # SECTION 3: PLATE CONFIGURATION DETAILS ⭐ FIXED
-        # ============================================================
-        story.append(Paragraph("🧾 Plate Configuration Details", section_style))
-        story.append(Spacer(1, 5))
-
-        plate_header = ["SL", "Plate ID", "Sheets Required", "Total UPS", "Layout Details"]
-        plate_data = [plate_header]
+        main_table = Table(summary_data, repeatRows=1)
         
-        for idx, p in enumerate(plates, 1):
-            # Create layout string
-            layout_str = ""
-            for tag, ups in p["layout"].items():
-                if ups > 0:
-                    # Get style name for better readability
-                    style_name = styles_dict.get(tag, tag)
-                    # Limit length
-                    if len(style_name) > 15:
-                        style_name = style_name[:12] + "..."
-                    layout_str += f"{style_name}:{ups} "
-            
-            plate_data.append([
-                str(idx),
-                p.get("name", f"Plate {idx}"),
-                str(p.get("sheets", 0)),
-                str(sum(p["layout"].values())),
-                layout_str[:50] + ("..." if len(layout_str) > 50 else "")
-            ])
-        
-        # Create plate table
-        pt = Table(plate_data, repeatRows=1)
-        pt.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#764ba2')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('ALIGN', (4,0), (4,-1), 'LEFT'),  # Layout column left aligned
-        ]))
-        story.append(pt)
-        story.append(Spacer(1, 15))
-
-        # ============================================================
-        # SECTION 4: SUMMARY STATISTICS
-        # ============================================================
-        story.append(Paragraph("📈 Summary Statistics", section_style))
-        story.append(Spacer(1, 5))
-
-        stats_data = [
-            ["Metric", "Value"],
-            ["Total Plates", str(len(plates))],
-            ["Total Sheets", str(sum(p.get("sheets", 0) for p in plates))],
-            ["Total UPS Capacity", str(sum(sum(p["layout"].values()) for p in plates))],
-            ["Total Demand", str(sum(demand.values()))],
-            ["Total Production", str(total_prod_sum)],
-            ["Total Excess", str(total_excess)],
-            ["Waste Percentage", f"{waste_percent}%"],
+        # Style the table
+        table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 7),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -2), 6),
+            ('ALIGN', (0, 1), (-1, -2), 'CENTER'),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#f0f0f0')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, -1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ]
         
-        stats_table = Table(stats_data, colWidths=[150, 150])
-        stats_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-            ('FONTSIZE', (0,0), (-1,-1), 8),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8f9fa')),
-        ]))
-        story.append(stats_table)
+        # Apply alternating row colors
+        for i in range(1, len(summary_data) - 1):
+            if i % 2 == 0:
+                table_style.append(('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f8f9fa')))
+        
+        main_table.setStyle(TableStyle(table_style))
+        story.append(main_table)
         story.append(Spacer(1, 15))
-
-        # ============================================================
-        # SECTION 5: FOOTER
-        # ============================================================
+        
+        # ============= PLATE DETAILS TABLE =============
+        story.append(Paragraph("🧾 Plate Configuration Details", 
+                              ParagraphStyle('SubHeader', parent=styles['Heading2'],
+                                           fontSize=11, alignment=TA_CENTER,
+                                           textColor=colors.HexColor('#667eea'))))
+        story.append(Spacer(1, 8))
+        
+        plate_data = [["SL", "Plate ID", "Sheets", "Total UPS"]]
+        for idx, p in enumerate(plates, 1):
+            plate_data.append([
+                str(idx), 
+                p["name"], 
+                str(p["sheets"]), 
+                str(sum(p["layout"].values()))
+            ])
+        
+        plate_table = Table(plate_data)
+        plate_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        
+        story.append(plate_table)
+        story.append(Spacer(1, 15))
+        
+        # ============= FOOTER =============
         story.append(Paragraph(
-            f"This Report Generated by Ovi's Plate Ratio System V2 | Job: {job_number} | All Rights Reserved",
+            f"This Report Generated by Ovi's Plate Ratio System | Job: {job_number if job_number else 'N/A'} | All Rights Reserved",
             footer_style
         ))
         
-        # ✅ Build PDF
+        # Build the PDF
         doc.build(story)
         buffer.seek(0)
         return buffer
-        
+
     except Exception as e:
-        st.error(f"PDF Generation Error: {str(e)}")
-        import traceback
-        st.error(traceback.format_exc())
+        print(f"PDF Generation Error: {str(e)}")
         return None
+
 # ================================================================
 # UNIVERSAL LAYOUT GENERATOR
 # ================================================================
