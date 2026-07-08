@@ -1281,99 +1281,98 @@ if generate_clicked:
                 st.error(f"Error generating report: {str(e)}")
                 st.info("Showing comparison table instead...")
         
-        # ============= ALGORITHM COMPARISON =============
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        # Add badges
-        def add_badges(row):
-            if row["Algorithm"] == best_algo:
-                return "🥇 " + row["Algorithm"]
-            elif row["Algorithm"] == comparison_df.iloc[1]["Algorithm"] if len(comparison_df) > 1 else False:
-                return "🥈 " + row["Algorithm"]
-            elif row["Algorithm"] == comparison_df.iloc[2]["Algorithm"] if len(comparison_df) > 2 else False:
-                return "🥉 " + row["Algorithm"]
-            return row["Algorithm"]
-        
-        comparison_df_display = comparison_df.copy()
-        comparison_df_display["Algorithm"] = comparison_df_display.apply(add_badges, axis=1)
-        
-        styled_df = comparison_df_display.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
-            if "🥇" in row["Algorithm"] else [''] * len(row),
-            axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=400)
+  # ================================================================
+# VIEW INDIVIDUAL ALGORITHM REPORT - FIXED
+# ================================================================
 
-        # ============= VIEW ANY ALGORITHM REPORT =============
-        st.markdown("---")
-        st.markdown("## 🔍 View Individual Algorithm Report")
+st.markdown("---")
+st.markdown("## 🔍 View Individual Algorithm Report")
 
-        if 'results' in st.session_state and st.session_state['results']:
-            algo_list = list(st.session_state['results'].keys())
+# ✅ Check if results exist in session state
+if 'results' in st.session_state and st.session_state['results']:
+    
+    # ✅ Get algorithm list
+    algo_list = list(st.session_state['results'].keys())
+    
+    if algo_list:
+        # ✅ Set default index to best algorithm
+        default_index = 0
+        if st.session_state.get('best_algo') in algo_list:
+            default_index = algo_list.index(st.session_state['best_algo'])
+        
+        # ✅ Create two columns: selector and button
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            selected_algo = st.selectbox(
+                "Select Algorithm to View Report:",
+                options=algo_list,
+                index=default_index,
+                key="independent_algo_selector"
+            )
+        
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            view_button = st.button("📋 View Report", use_container_width=True, type="primary")
+        
+        # ✅ When view button is clicked
+        if view_button:
+            selected_plates = st.session_state['results'].get(selected_algo)
             
-            default_index = 0
-            if st.session_state.get('best_algo') in algo_list:
-                default_index = algo_list.index(st.session_state['best_algo'])
-
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                selected_algo = st.selectbox(
-                    "Select Algorithm to View Report:",
-                    options=algo_list,
-                    index=default_index,
-                    key="independent_algo_selector"
-                )
-
-            with col2:
-                st.markdown("<br>", unsafe_allow_html=True)
-                view_button = st.button("📋 View Report", use_container_width=True, type="primary")
-
-            if view_button:
-                selected_plates = st.session_state['results'].get(selected_algo)
+            if selected_plates:
+                st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
                 
-                if selected_plates:
-                    st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
-                    
-                    full_df = build_full_summary(
-                        selected_plates, 
-                        st.session_state['demand'], 
-                        st.session_state['original_qty']
-                    )
+                # ✅ Build summary DataFrame
+                full_df = build_full_summary(
+                    selected_plates, 
+                    st.session_state.get('demand', {}), 
+                    st.session_state.get('original_qty', {})
+                )
+                
+                if not full_df.empty:
                     st.dataframe(full_df, use_container_width=True, height=400)
-
-                    st.markdown("### 🧾 Plate Configuration Details")
-                    plate_rows = []
-                    total_sheets = 0
-                    total_ups = 0
-                    
-                    for idx, p in enumerate(selected_plates, 1):
-                        ups_sum = sum(p["layout"].values())
-                        plate_rows.append({
-                            "SL": idx,
-                            "Plate ID": p.get("name", f"Plate {idx}"),
-                            "Sheets Required": p.get("sheets", 0),
-                            "Total UPS": ups_sum,
-                        })
-                        total_sheets += p.get("sheets", 0)
-                        total_ups += ups_sum
-
-                    plate_rows.append({
-                        "SL": "📊",
-                        "Plate ID": "TOTAL",
-                        "Sheets Required": total_sheets,
-                        "Total UPS": total_ups,
-                    })
-
-                    plate_df = pd.DataFrame(plate_rows)
-                    st.dataframe(plate_df, use_container_width=True)
-
-                    waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
-                    st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
-
                 else:
-                    st.error(f"❌ Report not found for {selected_algo}")
+                    st.warning("⚠️ No data to display")
+                
+                # ✅ Plate Configuration Details
+                st.markdown("### 🧾 Plate Configuration Details")
+                plate_rows = []
+                total_sheets = 0
+                total_ups = 0
+                
+                for idx, p in enumerate(selected_plates, 1):
+                    ups_sum = sum(p["layout"].values())
+                    plate_rows.append({
+                        "SL": idx,
+                        "Plate ID": p.get("name", f"Plate {idx}"),
+                        "Sheets Required": p.get("sheets", 0),
+                        "Total UPS": ups_sum,
+                    })
+                    total_sheets += p.get("sheets", 0)
+                    total_ups += ups_sum
+                
+                # ✅ Add total row
+                plate_rows.append({
+                    "SL": "📊",
+                    "Plate ID": "TOTAL",
+                    "Sheets Required": total_sheets,
+                    "Total UPS": total_ups,
+                })
+                
+                plate_df = pd.DataFrame(plate_rows)
+                st.dataframe(plate_df, use_container_width=True)
+                
+                # ✅ Waste and metrics
+                waste = calculate_waste_percent(selected_plates, st.session_state.get('demand', {}))
+                st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+                
+            else:
+                st.error(f"❌ Report not found for {selected_algo}")
+    else:
+        st.warning("⚠️ No algorithms found in results.")
+else:
+    st.info("ℹ️ Please generate the optimization first to view individual algorithm reports.")
+    st.info("💡 Click 'Generate' button above to run all algorithms.")
 
 # ================================================================
 # FOOTER
