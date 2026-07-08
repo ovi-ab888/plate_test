@@ -301,15 +301,14 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
                         algo_name: str, waste_percent: float,
                         styles_dict: dict, colors_dict: dict, sizes_dict: dict, 
                         job_number: str) -> BytesIO or None:
-    """Generate official ReportLab PDF documentation"""
+    """Generate official ReportLab PDF documentation with Plate Details"""
     
-    # ✅ Check if reportlab is available
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4, landscape
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
     except ImportError:
         st.warning("⚠️ reportlab not installed. Install with: pip install reportlab")
         return None
@@ -326,27 +325,39 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         )
         styles = getSampleStyleSheet()
 
-        # ✅ Title Style
+        # ✅ Custom Styles
         title_style = ParagraphStyle(
             'T1', 
             parent=styles['Heading1'], 
             fontSize=14, 
             alignment=TA_CENTER, 
-            textColor=colors.HexColor('#667eea')
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=8
         )
         job_style = ParagraphStyle(
             'T2', 
             parent=styles['Heading2'], 
             fontSize=12, 
             alignment=TA_CENTER, 
-            textColor=colors.HexColor('#764ba2')
+            textColor=colors.HexColor('#764ba2'),
+            spaceAfter=6
         )
         sub_style = ParagraphStyle(
             'T3', 
             parent=styles['Normal'], 
             fontSize=9, 
             alignment=TA_CENTER, 
-            textColor=colors.grey
+            textColor=colors.grey,
+            spaceAfter=12
+        )
+        section_style = ParagraphStyle(
+            'Section', 
+            parent=styles['Heading2'], 
+            fontSize=11, 
+            alignment=TA_CENTER, 
+            textColor=colors.HexColor('#667eea'),
+            spaceAfter=8,
+            spaceBefore=12
         )
         footer_style = ParagraphStyle(
             'T4', 
@@ -359,7 +370,9 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
 
         story = []
         
-        # ✅ Add content safely
+        # ============================================================
+        # SECTION 1: HEADER
+        # ============================================================
         story.append(Paragraph("📊 Plate Ratio System V2 - Layout Report", title_style))
         story.append(Paragraph(f"🔢 Job Number: {job_number}", job_style))
         story.append(Paragraph(
@@ -367,9 +380,14 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
             f"Run Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
             sub_style
         ))
-        story.append(Spacer(1, 15))
+        story.append(Spacer(1, 10))
 
-        # ✅ Build table header
+        # ============================================================
+        # SECTION 2: MAIN SUMMARY TABLE
+        # ============================================================
+        story.append(Paragraph("📊 Production Summary", section_style))
+        story.append(Spacer(1, 5))
+
         header = ["SL", "Style", "Color", "Size", "Original", "Target"]
         for p in plates: 
             header.append(f"Plate {p['name']}")
@@ -377,28 +395,20 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         
         table_data = [header]
         
-        # ✅ Add data rows safely
         sl = 1
         for tag in demand.keys():
-            # ✅ Safe string conversion
-            style = str(styles_dict.get(tag, "N/A"))[:20]  # Limit length
+            style = str(styles_dict.get(tag, "N/A"))[:20]
             color = str(colors_dict.get(tag, "N/A"))[:20]
             size = str(sizes_dict.get(tag, "N/A"))[:20]
             
             row = [
-                str(sl), 
-                style, 
-                color, 
-                size,
-                str(original_qty.get(tag, 0)), 
-                str(demand[tag])
+                str(sl), style, color, size,
+                str(original_qty.get(tag, 0)), str(demand[tag])
             ]
             
-            # ✅ Add plate data
             for p in plates:
                 row.append(str(p["layout"].get(tag, 0)))
                 
-            # ✅ Calculate totals
             total_prod = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
             excess = total_prod - demand[tag]
             excess_pct = f"{round((excess/demand[tag])*100, 1) if demand[tag] else 0}%"
@@ -406,7 +416,7 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
             table_data.append(row)
             sl += 1
         
-        # ✅ Add total row
+        # Total row
         total_row = ["📊", "TOTAL", "", "", 
                      str(sum(original_qty.values())), str(sum(demand.values()))]
         
@@ -421,20 +431,98 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         total_row.extend([str(total_prod_sum), str(total_excess), total_excess_pct])
         table_data.append(total_row)
         
-        # ✅ Create table
+        # Create main table
         t = Table(table_data, repeatRows=1)
         t.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.white),
             ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('FONTSIZE', (0,0), (-1,-1), 6),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
         ]))
         story.append(t)
         story.append(Spacer(1, 15))
+
+        # ============================================================
+        # SECTION 3: PLATE CONFIGURATION DETAILS ⭐ FIXED
+        # ============================================================
+        story.append(Paragraph("🧾 Plate Configuration Details", section_style))
+        story.append(Spacer(1, 5))
+
+        plate_header = ["SL", "Plate ID", "Sheets Required", "Total UPS", "Layout Details"]
+        plate_data = [plate_header]
         
-        # ✅ Add footer
+        for idx, p in enumerate(plates, 1):
+            # Create layout string
+            layout_str = ""
+            for tag, ups in p["layout"].items():
+                if ups > 0:
+                    # Get style name for better readability
+                    style_name = styles_dict.get(tag, tag)
+                    # Limit length
+                    if len(style_name) > 15:
+                        style_name = style_name[:12] + "..."
+                    layout_str += f"{style_name}:{ups} "
+            
+            plate_data.append([
+                str(idx),
+                p.get("name", f"Plate {idx}"),
+                str(p.get("sheets", 0)),
+                str(sum(p["layout"].values())),
+                layout_str[:50] + ("..." if len(layout_str) > 50 else "")
+            ])
+        
+        # Create plate table
+        pt = Table(plate_data, repeatRows=1)
+        pt.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#764ba2')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('FONTSIZE', (0,0), (-1,-1), 7),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('ALIGN', (4,0), (4,-1), 'LEFT'),  # Layout column left aligned
+        ]))
+        story.append(pt)
+        story.append(Spacer(1, 15))
+
+        # ============================================================
+        # SECTION 4: SUMMARY STATISTICS
+        # ============================================================
+        story.append(Paragraph("📈 Summary Statistics", section_style))
+        story.append(Spacer(1, 5))
+
+        stats_data = [
+            ["Metric", "Value"],
+            ["Total Plates", str(len(plates))],
+            ["Total Sheets", str(sum(p.get("sheets", 0) for p in plates))],
+            ["Total UPS Capacity", str(sum(sum(p["layout"].values()) for p in plates))],
+            ["Total Demand", str(sum(demand.values()))],
+            ["Total Production", str(total_prod_sum)],
+            ["Total Excess", str(total_excess)],
+            ["Waste Percentage", f"{waste_percent}%"],
+        ]
+        
+        stats_table = Table(stats_data, colWidths=[150, 150])
+        stats_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.black),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8f9fa')),
+        ]))
+        story.append(stats_table)
+        story.append(Spacer(1, 15))
+
+        # ============================================================
+        # SECTION 5: FOOTER
+        # ============================================================
         story.append(Paragraph(
             f"This Report Generated by Ovi's Plate Ratio System V2 | Job: {job_number} | All Rights Reserved",
             footer_style
@@ -446,10 +534,10 @@ def generate_pdf_report(plates: list, demand: dict, original_qty: dict,
         return buffer
         
     except Exception as e:
-        # ✅ Log error for debugging
         st.error(f"PDF Generation Error: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
         return None
-
 # ================================================================
 # UNIVERSAL LAYOUT GENERATOR
 # ================================================================
