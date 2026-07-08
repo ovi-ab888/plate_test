@@ -2494,7 +2494,7 @@ if input_mode == "✏️ Manual Input":
     st.session_state['item_sizes'] = {f"Item {i+1}": sizes[i] for i in range(n)}
 
 # ================================================================
-# EXCEL FILE UPLOAD - COMPLETE FIXED WITH SAFE INDEXING
+# EXCEL UPLOAD - COMPLETE FIXED WITH DEMAND DEFINITION
 # ================================================================
 else:
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
@@ -2512,6 +2512,8 @@ else:
             
             if df.empty:
                 st.warning("⚠️ The file is empty or contains no data.")
+                demand = {}
+                original_qty = {}
                 st.stop()
             
             columns_list = list(df.columns)
@@ -2524,7 +2526,6 @@ else:
             size_col = None
             qty_col = None
             
-            # Try to find columns by name
             for col in columns_list:
                 col_lower = str(col).lower().strip()
                 if col_lower in ['style', 'styles', 'product', 'products', 'item']:
@@ -2542,7 +2543,6 @@ else:
                 
                 c1, c2, c3, c4 = st.columns(4)
                 
-                # ✅ Safe index handling with len() check
                 with c1:
                     style_col = st.selectbox("🎨 Style Column", columns_list, index=0)
                 with c2:
@@ -2553,11 +2553,11 @@ else:
                     qty_col = st.selectbox("📊 Quantity Column", columns_list, index=min(3, len(columns_list)-1))
             
             # Process data
-            tags = []
-            styles = []
-            colors = []
-            sizes = []
-            qty = []
+            excel_tags = []
+            excel_styles = []
+            excel_colors = []
+            excel_sizes = []
+            excel_qty = []
             
             for idx, row in df.iterrows():
                 if row.isnull().all():
@@ -2578,43 +2578,62 @@ else:
                 
                 if q_val > 0:
                     tag = f"Item_{idx+1}_{style_val}_{size_val}"
-                    tags.append(tag)
-                    styles.append(style_val if style_val else "N/A")
-                    colors.append(color_val if color_val else "N/A")
-                    sizes.append(size_val if size_val else "N/A")
-                    qty.append(q_val)
+                    excel_tags.append(tag)
+                    excel_styles.append(style_val if style_val else "N/A")
+                    excel_colors.append(color_val if color_val else "N/A")
+                    excel_sizes.append(size_val if size_val else "N/A")
+                    excel_qty.append(q_val)
             
-            if tags:
-                st.success(f"✅ Successfully loaded {len(tags)} items from Excel!")
+            if excel_tags:
+                st.success(f"✅ Successfully loaded {len(excel_tags)} items from Excel!")
                 
                 preview_df = pd.DataFrame({
-                    "Style": styles[:10],
-                    "Color": colors[:10],
-                    "Size": sizes[:10],
-                    "Quantity": qty[:10]
+                    "Style": excel_styles[:10],
+                    "Color": excel_colors[:10],
+                    "Size": excel_sizes[:10],
+                    "Quantity": excel_qty[:10]
                 })
                 st.dataframe(preview_df, use_container_width=True)
                 
-                # Store in session state
+                # ✅ CRITICAL: Define demand and original_qty for Excel
+                tags = excel_tags
+                styles = excel_styles
+                colors = excel_colors
+                sizes = excel_sizes
+                qty = excel_qty
+                
+                original_qty = {tags[i]: qty[i] for i in range(len(tags))}
+                demand = {tags[i]: ceil(qty[i] * (1 + addon / 100)) for i in range(len(tags))}
+                
                 st.session_state['item_styles'] = {tags[i]: styles[i] for i in range(len(tags))}
                 st.session_state['item_colors'] = {tags[i]: colors[i] for i in range(len(tags))}
                 st.session_state['item_sizes'] = {tags[i]: sizes[i] for i in range(len(tags))}
-                st.session_state['excel_tags'] = tags
-                st.session_state['excel_qty'] = qty
-                st.session_state['excel_loaded'] = True
                 
             else:
                 st.warning("⚠️ No valid data found. Please check your Excel file format.")
-                st.info("💡 Expected format: Columns with headers like 'Style', 'Color', 'Size', 'Quantity'")
+                demand = {}
+                original_qty = {}
                 
         except Exception as e:
             st.error(f"❌ Error reading file: {str(e)}")
-            st.info("💡 Make sure your Excel file has columns: Style, Color, Size, Quantity")
+            demand = {}
+            original_qty = {}
     else:
         st.info("📤 Please upload an Excel file to continue.")
+        demand = {}
+        original_qty = {}
         st.stop()
     
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ================================================================
+# ✅ FINAL CHECK - demand ডিফাইন করা আছে কিনা
+# ================================================================
+if not demand:
+    st.error("⚠️ Please enter at least one item with quantity greater than 0")
+    st.stop()
+    
 # ================== WARNING MESSAGES ==================
 if not PULP_AVAILABLE:
     st.markdown('<div class="warning">⚠️ PuLP library not installed. Some advanced features disabled.</div>', unsafe_allow_html=True)
