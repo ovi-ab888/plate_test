@@ -841,6 +841,323 @@ def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> l
     
     return ensure_demand_met(plates, demand)
 
+def algo_hybrid_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """
+    V6 - Hybrid Optimizer
+    Combines Greedy + Proportional + Balanced strategies
+    Best for large datasets with mixed demands
+    """
+    best_score = 999999
+    best_plates = None
+    
+    strategies = ["greedy", "balanced", "proportional"]
+    
+    for strategy in strategies:
+        remaining = copy.deepcopy(demand)
+        plates = []
+        
+        for p in range(max_plates):
+            active = {k: v for k, v in remaining.items() if v > 0}
+            if not active:
+                break
+            
+            layout = create_valid_layout(active, capacity, strategy)
+            
+            if not layout or sum(layout.values()) != capacity:
+                break
+            
+            sheets = max(1, min(ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0))
+            
+            for tag, ups in layout.items():
+                remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+            
+            plates.append({
+                "name": plate_name(len(plates) + 1),
+                "layout": layout,
+                "sheets": sheets,
+                "plate_index": len(plates) + 1
+            })
+        
+        if any(v > 0 for v in remaining.values()) and plates:
+            last = plates[-1]
+            for tag in remaining:
+                if remaining[tag] > 0:
+                    ups = max(1, last["layout"].get(tag, 1))
+                    last["sheets"] += ceil(remaining[tag] / ups)
+                    remaining[tag] = 0
+        
+        waste = calculate_waste_percent(plates, demand)
+        if waste < best_score:
+            best_score = waste
+            best_plates = plates
+    
+    return ensure_demand_met(best_plates, demand) if best_plates else None
+
+def algo_greedy_plus_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """
+    V7 - Greedy Plus Optimizer
+    Enhanced greedy with dynamic sheet adjustment
+    Fastest for very large datasets
+    """
+    remaining = demand.copy()
+    plates = []
+    
+    for p in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        # Sort by demand (highest first)
+        sorted_items = sorted(active.items(), key=lambda x: x[1], reverse=True)
+        
+        layout = {}
+        used_capacity = 0
+        
+        # Allocate UPS proportionally with greedy adjustment
+        total_active = sum(active.values())
+        for tag, qty in sorted_items:
+            if used_capacity >= capacity:
+                break
+            
+            # Calculate ideal UPS
+            ideal_ups = max(1, int((qty / total_active) * capacity))
+            ups = min(ideal_ups, capacity - used_capacity)
+            
+            if ups > 0:
+                layout[tag] = ups
+                used_capacity += ups
+        
+        # Fill remaining capacity
+        while used_capacity < capacity and active:
+            best_tag = max(active, key=lambda t: remaining[t] / (layout.get(t, 1) + 1))
+            layout[best_tag] = layout.get(best_tag, 0) + 1
+            used_capacity += 1
+        
+        # Calculate sheets
+        sheets = max(1, min(ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0))
+        
+        # Apply
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        plates.append({
+            "name": plate_name(len(plates) + 1),
+            "layout": layout,
+            "sheets": sheets,
+            "plate_index": len(plates) + 1
+        })
+    
+    if any(v > 0 for v in remaining.values()) and plates:
+        last = plates[-1]
+        for tag in remaining:
+            if remaining[tag] > 0:
+                ups = max(1, last["layout"].get(tag, 1))
+                last["sheets"] += ceil(remaining[tag] / ups)
+                remaining[tag] = 0
+    
+    return ensure_demand_met(plates, demand)
+
+def algo_smart_partition_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """
+    V8 - Smart Partition Optimizer
+    Partitions large demand into balanced groups
+    Best for datasets with extreme variations
+    """
+    total_demand = sum(demand.values())
+    if total_demand == 0:
+        return []
+    
+    # Calculate optimal group size
+    group_size = total_demand / max_plates
+    
+    # Sort items by demand
+    sorted_items = sorted(demand.items(), key=lambda x: x[1], reverse=True)
+    
+    plates = []
+    remaining = demand.copy()
+    
+    for p in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        # Calculate target for this plate
+        target = group_size * (p + 1)
+        current_total = sum(remaining.values())
+        
+        # Select items for this plate
+        layout = {}
+        used_capacity = 0
+        selected_items = []
+        
+        for tag, qty in sorted_items:
+            if qty <= 0:
+                continue
+            
+            if used_capacity >= capacity:
+                break
+            
+            # Check if this item fits
+            ups = max(1, min(qty, capacity - used_capacity))
+            if ups > 0:
+                layout[tag] = ups
+                used_capacity += ups
+                selected_items.append(tag)
+        
+        # Fill remaining capacity
+        while used_capacity < capacity and active:
+            best_tag = max(active, key=lambda t: remaining[t] / (layout.get(t, 1) + 1))
+            layout[best_tag] = layout.get(best_tag, 0) + 1
+            used_capacity += 1
+        
+        # Calculate sheets
+        sheets = max(1, min(ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0))
+        
+        # Apply
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        plates.append({
+            "name": plate_name(len(plates) + 1),
+            "layout": layout,
+            "sheets": sheets,
+            "plate_index": len(plates) + 1
+        })
+    
+    if any(v > 0 for v in remaining.values()) and plates:
+        last = plates[-1]
+        for tag in remaining:
+            if remaining[tag] > 0:
+                ups = max(1, last["layout"].get(tag, 1))
+                last["sheets"] += ceil(remaining[tag] / ups)
+                remaining[tag] = 0
+    
+    return ensure_demand_met(plates, demand)
+
+def algo_iterative_refinement_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 50) -> list:
+    """
+    V9 - Iterative Refinement Optimizer
+    Starts with greedy, then iteratively improves
+    Best for high accuracy requirements
+    """
+    # Start with base solution
+    base = algo_greedy_plus_optimizer(demand, capacity, max_plates)
+    if not base:
+        return None
+    
+    best = copy.deepcopy(base)
+    best_waste = calculate_waste_percent(best, demand)
+    
+    for iteration in range(iterations):
+        # Try random improvements
+        test = copy.deepcopy(best)
+        
+        for plate in test:
+            tags = list(plate["layout"].keys())
+            if len(tags) >= 2:
+                a, b = random.sample(tags, 2)
+                if plate["layout"][a] > 1:
+                    plate["layout"][a] -= 1
+                    plate["layout"][b] += 1
+                    
+                    if sum(plate["layout"].values()) > capacity:
+                        plate["layout"][a] += 1
+                        plate["layout"][b] -= 1
+        
+        # Recalculate sheets
+        remaining = demand.copy()
+        for plate in test:
+            sheets = max(1, min(ceil(remaining[tag] / plate["layout"][tag]) 
+                               for tag in plate["layout"] if plate["layout"][tag] > 0))
+            plate["sheets"] = sheets
+            
+            for tag, ups in plate["layout"].items():
+                remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        waste = calculate_waste_percent(test, demand)
+        if waste < best_waste:
+            best_waste = waste
+            best = copy.deepcopy(test)
+    
+    return ensure_demand_met(best, demand)
+
+def algo_adaptive_learning_optimizer(demand: dict, capacity: int, max_plates: int, rounds: int = 10) -> list:
+    """
+    V10 - Adaptive Learning Optimizer
+    Learns from previous plate patterns
+    Best for repetitive similar datasets
+    """
+    # Store patterns
+    pattern_history = []
+    
+    remaining = demand.copy()
+    plates = []
+    
+    for p in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        # Check if we have a similar pattern
+        best_pattern = None
+        best_score = float('inf')
+        
+        for pattern in pattern_history:
+            score = sum(abs(pattern.get(tag, 0) - active.get(tag, 0)) for tag in active)
+            if score < best_score:
+                best_score = score
+                best_pattern = pattern
+        
+        # Use best pattern or create new
+        if best_pattern and best_score < 100:
+            layout = best_pattern.copy()
+        else:
+            # Create new layout
+            total_active = sum(active.values())
+            layout = {}
+            used_capacity = 0
+            
+            sorted_items = sorted(active.items(), key=lambda x: x[1], reverse=True)
+            for tag, qty in sorted_items:
+                if used_capacity >= capacity:
+                    break
+                ups = max(1, int((qty / total_active) * capacity))
+                ups = min(ups, capacity - used_capacity)
+                if ups > 0:
+                    layout[tag] = ups
+                    used_capacity += ups
+            
+            while used_capacity < capacity and active:
+                best_tag = max(active, key=lambda t: remaining[t] / (layout.get(t, 1) + 1))
+                layout[best_tag] = layout.get(best_tag, 0) + 1
+                used_capacity += 1
+        
+        # Store pattern for future
+        pattern_history.append(layout)
+        
+        # Calculate sheets
+        sheets = max(1, min(ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0))
+        
+        # Apply
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        plates.append({
+            "name": plate_name(len(plates) + 1),
+            "layout": layout,
+            "sheets": sheets,
+            "plate_index": len(plates) + 1
+        })
+    
+    if any(v > 0 for v in remaining.values()) and plates:
+        last = plates[-1]
+        for tag in remaining:
+            if remaining[tag] > 0:
+                ups = max(1, last["layout"].get(tag, 1))
+                last["sheets"] += ceil(remaining[tag] / ups)
+                remaining[tag] = 0
+    
+    return ensure_demand_met(plates, demand)
 
 # ================================================================
 # MAIN UI
@@ -1107,6 +1424,11 @@ if generate_clicked:
             "V3 - AI Mutation Engine": lambda: algo_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
             "V4 - AI Evolution Engine": lambda: algo_ai_evolution_optimizer(demand, cap, maxp, generations=100),
             "V5 - Base Ratio System": lambda: algo_base_ratio_optimizer(demand, cap, maxp),
+            "V6 - Hybrid Optimizer": lambda: algo_hybrid_optimizer(demand, cap, maxp),
+            "V7 - Greedy Plus Optimizer": lambda: algo_greedy_plus_optimizer(demand, cap, maxp),
+            "V8 - Smart Partition Optimizer": lambda: algo_smart_partition_optimizer(demand, cap, maxp),
+            "V9 - Iterative Refinement": lambda: algo_iterative_refinement_optimizer(demand, cap, maxp, iterations=50),
+             "V10 - Adaptive Learning": lambda: algo_adaptive_learning_optimizer(demand, cap, maxp, rounds=10),
         }
         
         # Run all algorithms with progress bar
