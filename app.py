@@ -643,13 +643,46 @@ def create_valid_layout(active: dict, capacity: int, method: str = "balanced") -
 
 
 def v1_optimizer(demand: dict, cap: int, max_plates: int) -> list:
-    """V1 - Base Ratio System"""
+    """V1 - Base Ratio System (Fixed - Uses max_plates)"""
     total = sum(demand.values())
     if total == 0:
         return []
-    layout = create_valid_layout(demand, cap, "balanced")
-    sheets = ceil(total / cap)
-    plates = [{"name": "A", "layout": layout, "sheets": sheets}]
+    
+    remaining = demand.copy()
+    plates = []
+    
+    # ✅ এখন max_plates ব্যবহার করছে
+    for i in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+        
+        # প্রতিটি প্লেটের জন্য layout তৈরি করুন
+        layout = create_valid_layout(active, cap, "balanced")
+        
+        # এই প্লেটের জন্য শীট ক্যালকুলেট করুন
+        sheets = ceil(sum(active.values()) / cap)
+        
+        # Apply this plate
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+        
+        plates.append({
+            "name": plate_name(i + 1),
+            "layout": layout,
+            "sheets": sheets
+        })
+    
+    # বাকি ডিমান্ড থাকলে শেষ প্লেটে যোগ করুন
+    if any(v > 0 for v in remaining.values()) and plates:
+        last = plates[-1]
+        for tag in remaining:
+            if remaining[tag] > 0:
+                ups = max(1, last["layout"].get(tag, 1))
+                additional = ceil(remaining[tag] / ups)
+                last["sheets"] += additional
+                remaining[tag] = 0
+    
     return ensure_demand_met(plates, demand)
 
 
