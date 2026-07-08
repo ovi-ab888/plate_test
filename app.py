@@ -841,6 +841,78 @@ def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> l
     
     return ensure_demand_met(plates, demand)
 
+# ================================================================
+# ALGORITHM 6: Smart Clustering Optimizer (Best for Large & Diverse Datasets)
+# ================================================================
+def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """V6 - Smart Clustering Optimizer (Reduces waste on huge quantity variance)"""
+    if not demand:
+        return []
+        
+    # Step 1: Cluster items into High, Medium, and Low volume
+    sorted_items = sorted(demand.items(), key=lambda x: x[1], reverse=True)
+    total_items = len(sorted_items)
+    
+    # Simple mathematical thresholding based on dataset profile
+    high_threshold = sorted_items[max(0, int(total_items * 0.2))][1]
+    low_threshold = sorted_items[max(0, int(total_items * 0.7))][1]
+    
+    remaining = copy.deepcopy(demand)
+    plates = []
+    
+    # Step 2: Generate plates phase by phase focusing on clustered priorities
+    for p_idx in range(max_plates):
+        active = {k: v for k, v in remaining.items() if v > 0}
+        if not active:
+            break
+            
+        layout = {}
+        # Allocate more UPS to high volume items remaining
+        high_actives = {k: v for k, v in active.items() if v >= low_threshold}
+        target_set = high_actives if high_actives else active
+        
+        # Build balanced layout for the selected target set
+        total_target_qty = sum(target_set.values())
+        for tag, qty in target_set.items():
+            ups = max(1, int((qty / total_target_qty) * capacity))
+            layout[tag] = ups
+            
+        # Refine layout capacity constraints
+        while sum(layout.values()) > capacity:
+            max_tag = max(layout, key=layout.get)
+            if layout[max_tag] > 1:
+                layout[max_tag] -= 1
+            else:
+                break
+                
+        while sum(layout.values()) < capacity:
+            # Fill remaining capacity with items that have highest pressure
+            max_tag = max(active, key=lambda t: active[t] / (layout.get(t, 1) + 1))
+            layout[max_tag] = layout.get(max_tag, 0) + 1
+            
+        # Determine optimal sheets for this plate based on median-low to prevent heavy overproduction
+        possible_sheets = [ceil(remaining[tag] / layout[tag]) for tag in layout if layout[tag] > 0]
+        if not possible_sheets:
+            break
+            
+        # Select a conservative sheet count (e.g., 40th percentile) to avoid blowing up lower items
+        possible_sheets.sort()
+        idx = min(int(len(possible_sheets) * 0.4), len(possible_sheets) - 1)
+        sheets = max(1, possible_sheets[idx])
+        
+        # Deduct printed quantities
+        for tag, ups in layout.items():
+            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
+            
+        plates.append({
+            "name": plate_name(len(plates) + 1),
+            "layout": layout,
+            "sheets": sheets,
+            "plate_index": len(plates) + 1
+        })
+        
+    return ensure_demand_met(plates, demand)
+
 
 
 # ================================================================
@@ -1108,6 +1180,7 @@ if generate_clicked:
             "V3 - AI Mutation Engine": lambda: algo_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
             "V4 - AI Evolution Engine": lambda: algo_ai_evolution_optimizer(demand, cap, maxp, generations=100),
             "V5 - Base Ratio System": lambda: algo_base_ratio_optimizer(demand, cap, maxp),
+            "V6 - Smart Clustering Optimizer": lambda: algo_smart_clustering_optimizer(demand, cap, maxp),
 
         }
         
