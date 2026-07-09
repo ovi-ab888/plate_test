@@ -949,6 +949,19 @@ if generate_clicked:
         
         st.dataframe(styled_df, use_container_width=True, height=400)
 
+        
+        # ============= ALGORITHM COMPARISON =============
+        st.markdown("---")
+        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
+        
+        styled_df = comparison_df.style.apply(
+            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
+            if row["Algorithm"] == best_algo else [''] * len(row),
+            axis=1
+        ).format({"Waste %": "{:.2f}%"})
+        
+        st.dataframe(styled_df, use_container_width=True, height=400)
+
         # ============= VIEW ANY ALGORITHM REPORT =============
         st.markdown("---")
         st.markdown("## 🔍 View Individual Algorithm Report")
