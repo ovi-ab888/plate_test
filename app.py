@@ -1,4 +1,4 @@
-# app.py — PLATE RATIO SYSTEM V2 (6 Algorithms for Large Dataset)
+# app.py — PLATE RATIO SYSTEM V2 (5 Algorithms for Large Dataset)
 # Optimized for Large Datasets • Production Ready • No Shortfall Guaranteed
 # Design by Ovi
 
@@ -34,7 +34,7 @@ except ImportError:
 # STREAMLIT PAGE CONFIGURATION
 # ================================================================
 st.set_page_config(
-    page_title="Plate Ratio System V2 - 6 Algorithms",
+    page_title="Plate Ratio System V2 - 5 Algorithms",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -180,8 +180,8 @@ st.markdown("""
 st.markdown("""
 <div class="main-header">
     <h1>🚀 Plate Ratio Intelligence System</h1>
-    <div class="subtitle">V2 • 6 Optimized Algorithms • Large Dataset Ready</div>
-    <div class="version">Smart Clustering • Multi-Variation • Global • AI Evolution • AI Mutation • Base Ratio</div>
+    <div class="subtitle">V2 • 5 Optimized Algorithms • Large Dataset Ready</div>
+    <div class="version">Smart Clustering • Multi-Variation • Global • AI Evolution • AI Mutation</div>
     <div class="designer">✨ Design by Ovi ✨</div>
 </div>
 """, unsafe_allow_html=True)
@@ -590,7 +590,7 @@ def algo_multi_variation_optimizer(demand: dict, capacity: int, max_plates: int)
 
 
 # ================================================================
-# ALGORITHM 3: AI Mutation Engine (V5)
+# ALGORITHM 2: AI Mutation Engine (V5)
 # ================================================================
 def algo_ai_mutation_optimizer(demand: dict, capacity: int, max_plates: int, iterations: int = 80) -> list:
     best_score = 999999
@@ -635,7 +635,7 @@ def algo_ai_mutation_optimizer(demand: dict, capacity: int, max_plates: int, ite
 
 
 # ================================================================
-# ALGORITHM 4: AI Evolution Engine (V17)
+# ALGORITHM 3: AI Evolution Engine (V17)
 # ================================================================
 def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, generations: int = 100) -> list:
     population = []
@@ -683,9 +683,8 @@ def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, ge
     return ensure_demand_met(best_solution, demand) if best_solution else algo_multi_variation_optimizer(demand, capacity, max_plates)
 
 
-
 # ================================================================
-# ALGORITHM 6: Smart Clustering & Dynamic Phase Chunking Engine
+# ALGORITHM 4: Smart Clustering & Dynamic Phase Chunking Engine (V6)
 # ================================================================
 def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     """V6 - High-Efficiency Multi-Phase Dynamic Chunking Engine for extreme variance"""
@@ -743,7 +742,7 @@ def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int
 
 
 # ================================================================
-# ALGORITHM 2: Global Multi-Plate Optimizer (V18)
+# ALGORITHM 5: Global Multi-Plate Optimizer (V2)
 # ================================================================
 def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
     candidates = []
@@ -751,8 +750,7 @@ def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         algo_smart_clustering_optimizer,
         algo_multi_variation_optimizer,
         algo_ai_mutation_optimizer,
-        algo_ai_evolution_optimizer,
-        algo_base_ratio_optimizer
+        algo_ai_evolution_optimizer
     ]
 
     for algo in algos:
@@ -764,7 +762,7 @@ def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
         except:
             pass
 
-    if not candidates: return algo_base_ratio_optimizer(demand, capacity, max_plates)
+    if not candidates: return algo_smart_clustering_optimizer(demand, capacity, max_plates)
     candidates.sort(key=lambda x: x[0])
     return ensure_demand_met(candidates[0][1], demand)
 
@@ -797,174 +795,216 @@ if input_mode == "✏️ Manual Input":
     st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
     col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
     col1.markdown("**SL**"); col2.markdown("**Style**"); col3.markdown("**Color**"); col4.markdown("**Size**"); col5.markdown("**Quantity**")
-    st.markdown("---")
-    
+
     for i in range(n):
         col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
-        col1.markdown(f"**{i+1}**")
-        style_val = col2.text_input("Style", value=f"Style_{i+1}", key=f"style_{i}", label_visibility="collapsed")
-        color_val = col3.text_input("Color", value="Black", key=f"color_{i}", label_visibility="collapsed")
-        size_val = col4.text_input("Size", value=chr(83 + i % 4), key=f"size_{i}", label_visibility="collapsed")
-        qty_val = col5.number_input("Quantity", min_value=0, value=1000 * (i+1), step=100, key=f"qty_manual_{i}", label_visibility="collapsed")
+        col1.markdown(f"<p style='margin-top:10px;'>{i+1}</p>", unsafe_allow_html=True)
         
-        style_d = style_val.strip() if style_val.strip() else "N/A"
-        color_d = color_val.strip() if color_val.strip() else "N/A"
-        size_d = size_val.strip() if size_val.strip() else "N/A"
+        s_val = col2.text_input(f"Style", value="STYLE", key=f"s_{i}", label_visibility="collapsed")
+        c_val = col3.text_input(f"Color", value="COLOR", key=f"c_{i}", label_visibility="collapsed")
+        sz_val = col4.text_input(f"Size", value="FREE", key=f"sz_{i}", label_visibility="collapsed")
+        q_val = col5.number_input(f"QTY", min_value=1, value=1000, key=f"q_{i}", label_visibility="collapsed")
         
-        tag = f"Item_{i+1}_{style_d}_{size_d}"
-        tags.append(tag); qty.append(qty_val); styles.append(style_d); colors.append(color_d); sizes.append(size_d)
-    
+        unique_tag = f"{s_val} | {c_val} | {sz_val}"
+        
+        styles.append(s_val)
+        colors.append(c_val)
+        sizes.append(sz_val)
+        qty.append(q_val)
+        tags.append(unique_tag)
     st.markdown('</div>', unsafe_allow_html=True)
-    original_qty = {tags[i]: qty[i] for i in range(len(tags)) if qty[i] > 0}
-    demand = {tags[i]: ceil(qty[i] * (1 + addon / 100)) for i in range(len(tags)) if qty[i] > 0}
-    
-    st.session_state['item_styles'] = {tags[i]: styles[i] for i in range(len(tags))}
-    st.session_state['item_colors'] = {tags[i]: colors[i] for i in range(len(tags))}
-    st.session_state['item_sizes'] = {tags[i]: sizes[i] for i in range(len(tags))}
 
 else:
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Upload Excel File</div>', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Upload Excel file with Item Details", type=["xlsx", "xls"])
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Excel/CSV File Upload</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload Excel or CSV file (Must have columns: Style, Color, Size, QTY)", type=["xlsx", "xls", "csv"])
     
     if uploaded_file is not None:
         try:
-            df = pd.read_excel(uploaded_file).dropna(how='all')
-            if df.empty: st.stop()
-            columns_list = list(df.columns)
-            st.dataframe(df.head(5), use_container_width=True)
-            
-            style_col, color_col, size_col, qty_col = None, None, None, None
-            for col in columns_list:
-                col_lower = str(col).lower().strip()
-                if col_lower in ['style', 'styles', 'product', 'products', 'item']: style_col = col
-                elif col_lower in ['color', 'colors', 'colour']: color_col = col
-                elif col_lower in ['size', 'sizes']: size_col = col
-                elif col_lower in ['quantity', 'qty', 'qty.', 'quantities', 'total', 'order']: qty_col = col
-            
-            if not style_col or not color_col or not size_col or not qty_col:
-                c1, c2, c3, c4 = st.columns(4)
-                style_col = c1.selectbox("🎨 Style Column", columns_list, index=0)
-                color_col = c2.selectbox("🌈 Color Column", columns_list, index=min(1, len(columns_list)-1))
-                size_col = c3.selectbox("📏 Size Column", columns_list, index=min(2, len(columns_list)-1))
-                qty_col = c4.selectbox("📊 Quantity Column", columns_list, index=min(3, len(columns_list)-1))
-            
-            for idx, row in df.iterrows():
-                style_val = str(row.get(style_col, '')).strip() if pd.notnull(row.get(style_col)) else "N/A"
-                color_val = str(row.get(color_col, '')).strip() if pd.notnull(row.get(color_col)) else "N/A"
-                size_val = str(row.get(size_col, '')).strip() if pd.notnull(row.get(size_col)) else "N/A"
-                qty_raw = row.get(qty_col, 0)
-                try: q_val = int(float(qty_raw))
-                except: continue
+            if uploaded_file.name.endswith('.csv'):
+                df_input = pd.read_csv(uploaded_file)
+            else:
+                df_input = pd.read_excel(uploaded_file)
                 
-                if q_val > 0:
-                    tag = f"Item_{idx+1}_{style_val}_{size_val}"
-                    tags.append(tag); styles.append(style_val); colors.append(color_val); sizes.append(size_val); qty.append(q_val)
+            df_input.columns = [str(c).strip().lower() for c in df_input.columns]
             
-            if tags:
-                original_qty = {tags[i]: qty[i] for i in range(len(tags))}
-                demand = {tags[i]: ceil(qty[i] * (1 + addon / 100)) for i in range(len(tags))}
-                st.session_state['item_styles'] = {tags[i]: styles[i] for i in range(len(tags))}
-                st.session_state['item_colors'] = {tags[i]: colors[i] for i in range(len(tags))}
-                st.session_state['item_sizes'] = {tags[i]: sizes[i] for i in range(len(tags))}
+            col_map = {
+                'style': ['style', 'style no', 'item', 'design'],
+                'color': ['color', 'colour', 'shade'],
+                'size': ['size', 'sz'],
+                'qty': ['qty', 'quantity', 'demand', 'order qty']
+            }
+            
+            final_cols = {}
+            for target, options in col_map.items():
+                for opt in options:
+                    if opt in df_input.columns:
+                        final_cols[target] = opt
+                        break
+            
+            if 'qty' in final_cols:
+                n = len(df_input)
+                for idx, row in df_input.iterrows():
+                    s_val = str(row.get(final_cols.get('style', ''), 'STYLE')).strip().upper()
+                    c_val = str(row.get(final_cols.get('color', ''), 'COLOR')).strip().upper()
+                    sz_val = str(row.get(final_cols.get('size', ''), 'FREE')).strip().upper()
+                    q_val = int(row.get(final_cols['qty'], 0))
+                    
+                    if q_val > 0:
+                        unique_tag = f"{s_val} | {c_val} | {sz_val}"
+                        styles.append(s_val)
+                        colors.append(c_val)
+                        sizes.append(sz_val)
+                        qty.append(q_val)
+                        tags.append(unique_tag)
+                st.success(f"✅ Successfully loaded {len(tags)} valid items from file!")
+            else:
+                st.error("❌ 'QTY' column not found in the uploaded file.")
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}"); st.stop()
-    else:
-        st.stop()
+            st.error(f"❌ Error reading file: {str(e)}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-if not demand: st.stop()
+# Build Demand Maps
+styles_dict = {}
+colors_dict = {}
+sizes_dict = {}
 
-col1, col2, col3 = st.columns([1, 2, 1])
-generate_clicked = col2.button("Run Algorithms", use_container_width=True, type="primary")
+for t, s, c, sz, q in zip(tags, styles, colors, sizes, qty):
+    original_qty[t] = original_qty.get(t, 0) + q
+    demand[t] = ceil(original_qty[t] * (1 + addon / 100))
+    styles_dict[t] = s
+    colors_dict[t] = c
+    sizes_dict[t] = sz
 
-if generate_clicked:
-    with st.spinner("🔍 Executing Advanced Multi-Phase Computations..."):
-        algo_functions = {
-            "V1 - Multi-Variation Optimizer": lambda: algo_multi_variation_optimizer(demand, cap, maxp),
-            "V2 - Global Multi-Plate Optimizer": lambda: algo_global_optimizer(demand, cap, maxp),
-            "V3 - AI Mutation Engine": lambda: algo_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
-            "V4 - AI Evolution Engine": lambda: algo_ai_evolution_optimizer(demand, cap, maxp, generations=100),
-            "V6 - Smart Clustering Optimizer": lambda: algo_smart_clustering_optimizer(demand, cap, maxp),
-        }
-        
-        results = {}
-        for algo_name, func in algo_functions.items():
-            try: results[algo_name] = func()
-            except: results[algo_name] = algo_base_ratio_optimizer(demand, cap, maxp)
-        
-        comparison_data = []
-        for algo_name, plates in results.items():
-            if plates:
-                waste = calculate_waste_percent(plates, demand)
-                comparison_data.append({"Algorithm": algo_name, "Waste %": waste, "Total Plates": len(plates), "Total Sheets": sum(p.get("sheets", 0) for p in plates), "Status": "✅ Success"})
-        
-        comparison_df = pd.DataFrame(comparison_data).sort_values("Waste %")
-        best_algo = comparison_df.iloc[0]["Algorithm"]
-        best_waste = comparison_df.iloc[0]["Waste %"]
-        
-        st.session_state.update({'results': results, 'comparison_df': comparison_df, 'best_algo': best_algo, 'best_waste': best_waste, 'demand': demand, 'original_qty': original_qty})
-        
-        st.markdown(f'<div class="best-algo"><div class="metric-value">🏆 BEST ALGORITHM: {best_algo}</div><div class="metric-label">Waste Percentage: {best_waste}%</div></div>', unsafe_allow_html=True)
-        
-      # ============= ALGORITHM COMPARISON =============
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        styled_df = comparison_df.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
-            if row["Algorithm"] == best_algo else [''] * len(row),
-            axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=400)
+st.session_state['demand'] = demand
+st.session_state['original_qty'] = original_qty
 
-        
-        # ============= ALGORITHM COMPARISON =============
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        styled_df = comparison_df.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
-            if row["Algorithm"] == best_algo else [''] * len(row),
-            axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=400)
 
-# ============= VIEW ANY ALGORITHM REPORT =============
-st.markdown("---")
-st.markdown("## 🔍 View Individual Algorithm Report")
-
-if 'results' in st.session_state and st.session_state['results']:
-    algo_list = list(st.session_state['results'].keys())
+# ================================================================
+# PROCESSING ENGINE & AUTO-SELECTION
+# ================================================================
+if tags and sum(qty) > 0:
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📊 Optimization Control Center</div>', unsafe_allow_html=True)
     
-    default_index = 0
-    if st.session_state.get('best_algo') in algo_list:
-        default_index = algo_list.index(st.session_state['best_algo'])
-
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        selected_algo = st.selectbox(
-            "Select Algorithm to View Report:",
-            options=algo_list,
-            index=default_index,
-            key="independent_algo_selector"
-        )
-
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        view_button = st.button("📋 View Report", use_container_width=True, type="primary")
-
-    if view_button:
-        selected_plates = st.session_state['results'].get(selected_algo)
+    all_results = {}
+    with st.spinner("⚡ AI Engines running parallel optimization..."):
+        res_v6 = algo_smart_clustering_optimizer(demand, cap, maxp)
+        if res_v6: all_results["V6-Smart Clustering Optimizer"] = res_v6
         
-        if selected_plates:
-            st.markdown(f"### 📊 Production Summary — **{selected_algo}**")
+        res_v2 = algo_global_optimizer(demand, cap, maxp)
+        if res_v2: all_results["V2 - Global Multi-Plate Optimizer"] = res_v2
+        
+        res_v17 = algo_ai_evolution_optimizer(demand, cap, maxp)
+        if res_v17: all_results["V17 - AI Evolution Engine"] = res_v17
+        
+        res_v5 = algo_ai_mutation_optimizer(demand, cap, maxp)
+        if res_v5: all_results["V5 - AI Mutation Engine"] = res_v5
+        
+        res_v4 = algo_multi_variation_optimizer(demand, cap, maxp)
+        if res_v4: all_results["V4 - Multi-Variation Optimizer"] = res_v4
+
+    # Build Comparison Summary
+    comp_rows = []
+    for name, plates in all_results.items():
+        w = calculate_waste_percent(plates, demand)
+        tot_sheets = sum(p["sheets"] for p in plates)
+        comp_rows.append({"Algorithm": name, "Waste %": w, "Plates": len(plates), "Total Sheets": tot_sheets})
+        
+    comparison_df = pd.DataFrame(comp_rows).sort_values(by="Waste %")
+    best_algo_name = comparison_df.iloc[0]["Algorithm"]
+    min_waste = comparison_df.iloc[0]["Waste %"]
+    
+    st.session_state['all_results'] = all_results
+
+    if best_algo_name:
+        st.markdown(f"""
+        <div class="best-algo">
+            <div class="metric-label">🏆 AUTOMATIC AI RECOMMENDATION</div>
+            <div class="metric-value">{best_algo_name}</div>
+            <div class="metric-label">Achieved Lowest Material Waste of <b>{min_waste}%</b></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Main Selection Dropdown
+    algo_options = list(all_results.keys())
+    default_idx = algo_options.index(best_algo_name) if best_algo_name in algo_options else 0
+    selected_algo = st.selectbox("🎯 Select Active Algorithm to View/Print:", options=algo_options, index=default_idx)
+    
+    if selected_algo:
+        selected_plates = all_results[selected_algo]
+        final_waste = calculate_waste_percent(selected_plates, demand)
+        
+        total_sheets = sum(p["sheets"] for p in selected_plates)
+        grand_produced = 0
+        for t in demand:
+            grand_produced += sum(p["layout"].get(t, 0) * p["sheets"] for p in selected_plates)
             
-            full_df = build_full_summary(
-                selected_plates, 
-                st.session_state['demand'], 
-                st.session_state['original_qty']
+        m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+        with m_col1:
+            st.markdown(f'<div class="metric-card"><div class="metric-value" style="color:#ff4b4b;">{final_waste}%</div><div class="metric-label">📊 Material Waste</div></div>', unsafe_allow_html=True)
+        with m_col2:
+            st.markdown(f'<div class="metric-card"><div class="metric-value">{len(selected_plates)} / {maxp}</div><div class="metric-label">🎨 Plates Used</div></div>', unsafe_allow_html=True)
+        with m_col3:
+            st.markdown(f'<div class="metric-card"><div class="metric-value">{total_sheets:,}</div><div class="metric-label">📄 Total Print Sheets</div></div>', unsafe_allow_html=True)
+        with m_col4:
+            st.markdown(f'<div class="metric-card"><div class="metric-value">{grand_produced:,}</div><div class="metric-label">📦 Total Output QTY</div></div>', unsafe_allow_html=True)
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        st.subheader("📋 Optimization Breakdown Matrix")
+        summary_df = build_full_summary(selected_plates, demand, original_qty)
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+        
+        st.subheader("🧾 Active Plate Layouts")
+        p_cols = st.columns(min(len(selected_plates), 3))
+        for p_idx, p in enumerate(selected_plates):
+            with p_cols[p_idx % 3]:
+                st.markdown(f"""
+                <div class="card" style="border-top: 4px solid #667eea;">
+                    <h3 style="margin:0; color:#667eea;">🎨 Plate {p['name']}</h3>
+                    <p style="margin:5px 0; font-size:1.1rem;">📄 Sheets: <b>{p['sheets']:,}</b></p>
+                    <p style="margin:0 0 10px 0; font-size:0.9rem; color:rgba(255,255,255,0.6);">Total UPS: {sum(p['layout'].values())} / {cap}</p>
+                    <hr style="border-color:rgba(255,255,255,0.1);">
+                """, unsafe_allow_html=True)
+                
+                for t, ups in p["layout"].items():
+                    if ups > 0:
+                        st.markdown(f"🔹 <span style='font-size:0.85rem;'>{t}</span> → <b>{ups} UPS</b>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+        # PDF Generator Trigger
+        if REPORTLAB_AVAILABLE:
+            pdf_buffer = generate_pdf_report(
+                selected_plates, demand, original_qty,
+                selected_algo, final_waste,
+                styles_dict, colors_dict, sizes_dict, job_number
             )
+            if pdf_buffer:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.download_button(
+                    label="📥 Download Professional PDF Report",
+                    data=pdf_buffer,
+                    file_name=f"Plate_Report_{job_number}.pdf",
+                    mime="application/pdf"
+                )
+        else:
+            st.warning("⚠️ ReportLab library missing. PDF download feature is disabled.")
+            
+    st.markdown('</div>', unsafe_allow_html=True)
+
+
+    # ================================================================
+    # 📑 VIEW INDIVIDUAL ALGORITHM REPORT SECTION
+    # ================================================================
+    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📑 View Individual Algorithm Report</div>', unsafe_allow_html=True)
+    
+    report_options = list(st.session_state['all_results'].keys())
+    selected_report_algo = st.selectbox("🔍 Choose Algorithm for Detailed Report:", options=report_options, key="report_algo_select")
+
+    if selected_report_algo:
+        selected_plates = st.session_state['all_results'].get(selected_report_algo)
+        if selected_plates:
+            st.markdown(f"### 📋 Detailed Breakdowns Matrix ({selected_report_algo})")
+            full_df = build_full_summary(selected_plates, st.session_state['demand'], st.session_state['original_qty'])
             st.dataframe(full_df, use_container_width=True, height=400)
 
             st.markdown("### 🧾 Plate Configuration Details")
@@ -995,11 +1035,27 @@ if 'results' in st.session_state and st.session_state['results']:
 
             waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
             st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
-
         else:
             st.error(f"❌ Report not found for {selected_algo}")
 
-
         st.markdown("---")
         st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        st.dataframe(comparison_df.style.format({"Waste %": "{:.2f}%"}), use_container_width=True)
+        st.dataframe(comparison_df.style.background_gradient(cmap='viridis', subset=['Waste %']), use_container_width=True, hide_index=True)
+
+
+# ================================================================
+# FOOTER
+# ================================================================
+st.markdown("""
+<div style="text-align: center; padding: 2rem; margin-top: 3rem; border-top: 2px solid rgba(102,126,234,0.3); background: rgba(255,255,255,0.02); border-radius: 20px;">
+    <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;">
+        © 2026 Plate Ratio System | Version 2 (5 Algorithms Edition)
+    </p>
+    <p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin: 5px 0;">
+        Optimized for Large Datasets • 5 Core Algorithms • Production Ready
+    </p>
+    <p style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 0.85rem; font-weight: 600; margin: 0;">
+        ✨ Design & Engineered by Ovi ✨
+    </p>
+</div>
+""", unsafe_allow_html=True)
