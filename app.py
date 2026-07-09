@@ -947,22 +947,7 @@ if tags and sum(qty) > 0:
         summary_df = build_full_summary(selected_plates, demand, original_qty)
         st.dataframe(summary_df, use_container_width=True, hide_index=True)
         
-        st.subheader("🧾 Active Plate Layouts")
-        p_cols = st.columns(min(len(selected_plates), 3))
-        for p_idx, p in enumerate(selected_plates):
-            with p_cols[p_idx % 3]:
-                st.markdown(f"""
-                <div class="card" style="border-top: 4px solid #667eea;">
-                    <h3 style="margin:0; color:#667eea;">🎨 Plate {p['name']}</h3>
-                    <p style="margin:5px 0; font-size:1.1rem;">📄 Sheets: <b>{p['sheets']:,}</b></p>
-                    <p style="margin:0 0 10px 0; font-size:0.9rem; color:rgba(255,255,255,0.6);">Total UPS: {sum(p['layout'].values())} / {cap}</p>
-                    <hr style="border-color:rgba(255,255,255,0.1);">
-                """, unsafe_allow_html=True)
-                
-                for t, ups in p["layout"].items():
-                    if ups > 0:
-                        st.markdown(f"🔹 <span style='font-size:0.85rem;'>{t}</span> → <b>{ups} UPS</b>", unsafe_allow_html=True)
-                st.markdown("</div>", unsafe_allow_html=True)
+        # [REMOVED SECTION: 🧾 Active Plate Layouts]
                 
         # PDF Generator Trigger
         if REPORTLAB_AVAILABLE:
