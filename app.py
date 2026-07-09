@@ -937,6 +937,18 @@ if generate_clicked:
         
         st.markdown(f'<div class="best-algo"><div class="metric-value">🏆 BEST ALGORITHM: {best_algo}</div><div class="metric-label">Waste Percentage: {best_waste}%</div></div>', unsafe_allow_html=True)
         
+      # ============= ALGORITHM COMPARISON =============
+        st.markdown("---")
+        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
+        
+        styled_df = comparison_df.style.apply(
+            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
+            if row["Algorithm"] == best_algo else [''] * len(row),
+            axis=1
+        ).format({"Waste %": "{:.2f}%"})
+        
+        st.dataframe(styled_df, use_container_width=True, height=400)
+
         # ============= VIEW ANY ALGORITHM REPORT =============
         st.markdown("---")
         st.markdown("## 🔍 View Individual Algorithm Report")
@@ -1005,6 +1017,7 @@ if generate_clicked:
 
                 else:
                     st.error(f"❌ Report not found for {selected_algo}")
+
 
         st.markdown("---")
         st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
