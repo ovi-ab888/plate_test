@@ -683,37 +683,6 @@ def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, ge
     return ensure_demand_met(best_solution, demand) if best_solution else algo_multi_variation_optimizer(demand, capacity, max_plates)
 
 
-# ================================================================
-# ALGORITHM 5: Base Ratio System (V1 - Fixed)
-# ================================================================
-def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    total = sum(demand.values())
-    if total == 0: return []
-    remaining = demand.copy()
-    plates = []
-    
-    for i in range(max_plates):
-        active = {k: v for k, v in remaining.items() if v > 0}
-        if not active: break
-        
-        layout = create_valid_layout(active, capacity, "balanced")
-        sheets = ceil(sum(active.values()) / capacity)
-        
-        for tag, ups in layout.items():
-            remaining[tag] = max(0, remaining[tag] - (ups * sheets))
-        
-        plates.append({"name": plate_name(i + 1), "layout": layout, "sheets": sheets, "plate_index": i + 1})
-    
-    if any(v > 0 for v in remaining.values()) and plates:
-        last = plates[-1]
-        for tag in remaining:
-            if remaining[tag] > 0:
-                ups = max(1, last["layout"].get(tag, 1))
-                last["sheets"] += ceil(remaining[tag] / ups)
-                remaining[tag] = 0
-    
-    return ensure_demand_met(plates, demand)
-
 
 # ================================================================
 # ALGORITHM 6: Smart Clustering & Dynamic Phase Chunking Engine
@@ -914,7 +883,6 @@ if generate_clicked:
             "V2 - Global Multi-Plate Optimizer": lambda: algo_global_optimizer(demand, cap, maxp),
             "V3 - AI Mutation Engine": lambda: algo_ai_mutation_optimizer(demand, cap, maxp, iterations=50),
             "V4 - AI Evolution Engine": lambda: algo_ai_evolution_optimizer(demand, cap, maxp, generations=100),
-            "V5 - Base Ratio System": lambda: algo_base_ratio_optimizer(demand, cap, maxp),
             "V6 - Smart Clustering Optimizer": lambda: algo_smart_clustering_optimizer(demand, cap, maxp),
         }
         
