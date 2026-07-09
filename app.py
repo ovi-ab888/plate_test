@@ -231,14 +231,11 @@ def ensure_demand_met(plates: list, demand: dict) -> list:
     if not plates or not demand: 
         return plates
     
-    # 1. Loop over each item to check for production shortages
     for tag in demand.keys():
         total_produced = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
         
         if total_produced < demand[tag]:
             shortfall = demand[tag] - total_produced
-            
-            # Find the best plate that contains this item (highest UPS preferred)
             best_plate = None
             max_ups = 0
             
@@ -248,18 +245,15 @@ def ensure_demand_met(plates: list, demand: dict) -> list:
                     max_ups = ups
                     best_plate = p
                     
-            # If item is found on a plate, increase sheets of that plate
             if best_plate and max_ups > 0:
                 additional_sheets = ceil(shortfall / max_ups)
                 best_plate["sheets"] += additional_sheets
             else:
-                # Emergency fallback: If the item has 0 UPS on all plates, force 1 UPS on the last plate
                 last_plate = plates[-1]
                 last_plate["layout"][tag] = 1
                 additional_sheets = ceil(shortfall / 1)
                 last_plate["sheets"] += additional_sheets
 
-    # 2. Recalculate full matrix data safely
     for p in plates:
         p["production"] = {tag: ups * p["sheets"] for tag, ups in p["layout"].items()}
         if "name" not in p:
@@ -544,6 +538,14 @@ def create_valid_layout(active: dict, capacity: int, method: str = "balanced") -
 
 
 # ================================================================
+# FALLBACK ALGORITHM (Base Ratio Placeholder)
+# ================================================================
+def algo_base_ratio_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
+    """Fallback Engine for Base Ratio calculation if missing"""
+    return algo_smart_clustering_optimizer(demand, capacity, max_plates)
+
+
+# ================================================================
 # ALGORITHM 1: Multi-Variation Optimizer (V4)
 # ================================================================
 def algo_multi_variation_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
@@ -681,7 +683,6 @@ def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, ge
         population = new_population
 
     return ensure_demand_met(best_solution, demand) if best_solution else algo_multi_variation_optimizer(demand, capacity, max_plates)
-
 
 
 # ================================================================
@@ -905,19 +906,6 @@ if generate_clicked:
         
         st.markdown(f'<div class="best-algo"><div class="metric-value">🏆 BEST ALGORITHM: {best_algo}</div><div class="metric-label">Waste Percentage: {best_waste}%</div></div>', unsafe_allow_html=True)
         
-      # ============= ALGORITHM COMPARISON =============
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
-        
-        styled_df = comparison_df.style.apply(
-            lambda row: ['background-color: #2e7d32; color: white'] * len(row)
-            if row["Algorithm"] == best_algo else [''] * len(row),
-            axis=1
-        ).format({"Waste %": "{:.2f}%"})
-        
-        st.dataframe(styled_df, use_container_width=True, height=400)
-
-        
         # ============= ALGORITHM COMPARISON =============
         st.markdown("---")
         st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
@@ -998,8 +986,23 @@ if 'results' in st.session_state and st.session_state['results']:
 
         else:
             st.error(f"❌ Report not found for {selected_algo}")
-
-
-        st.markdown("---")
-        st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
         st.dataframe(comparison_df.style.format({"Waste %": "{:.2f}%"}), use_container_width=True)
+
+
+# ================================================================
+# FOOTER
+# ================================================================
+st.markdown("""
+<div style="text-align: center; padding: 2rem; margin-top: 3rem; border-top: 2px solid rgba(102,126,234,0.3); background: rgba(255,255,255,0.02); border-radius: 20px;">
+    <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;">
+        © 2026 Plate Ratio System | Version 2 (5 Algorithms Edition)
+    </p>
+    <p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin: 5px 0;">
+        Optimized for Large Datasets • 5 Core Algorithms • Production Ready
+    </p>
+    <p style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 0.85rem; font-weight: 600; margin: 10px 0 0 0;">
+        ✨ Developed by Ovi | All Rights Reserved ✨
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
