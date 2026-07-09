@@ -42,7 +42,7 @@ st.set_page_config(
 
 
 # ================================================================
-# MODERN UI STYLING & CUSTOM CSS
+# MODERN UI STYLING & CUSTOM CSS (PRESERVING ORIGINAL DESIGN)
 # ================================================================
 st.markdown("""
 <style>
@@ -224,21 +224,18 @@ def calculate_waste_percent(plates: list, demand: dict) -> float:
 
 
 # ================================================================
-# 🔥 CRITICAL FIX: SMART SHORTFALL PREVENTION ENGINE 🔥
+# 🔥 SMART SHORTFALL PREVENTION ENGINE 🔥
 # ================================================================
 def ensure_demand_met(plates: list, demand: dict) -> list:
     """Guarantees Total Produced QTY >= Demand for every single item without exception"""
     if not plates or not demand: 
         return plates
     
-    # 1. Loop over each item to check for production shortages
     for tag in demand.keys():
         total_produced = sum(p["layout"].get(tag, 0) * p["sheets"] for p in plates)
         
         if total_produced < demand[tag]:
             shortfall = demand[tag] - total_produced
-            
-            # Find the best plate that contains this item (highest UPS preferred)
             best_plate = None
             max_ups = 0
             
@@ -248,18 +245,15 @@ def ensure_demand_met(plates: list, demand: dict) -> list:
                     max_ups = ups
                     best_plate = p
                     
-            # If item is found on a plate, increase sheets of that plate
             if best_plate and max_ups > 0:
                 additional_sheets = ceil(shortfall / max_ups)
                 best_plate["sheets"] += additional_sheets
             else:
-                # Emergency fallback: If the item has 0 UPS on all plates, force 1 UPS on the last plate
                 last_plate = plates[-1]
                 last_plate["layout"][tag] = 1
                 additional_sheets = ceil(shortfall / 1)
                 last_plate["sheets"] += additional_sheets
 
-    # 2. Recalculate full matrix data safely
     for p in plates:
         p["production"] = {tag: ups * p["sheets"] for tag, ups in p["layout"].items()}
         if "name" not in p:
@@ -687,7 +681,6 @@ def algo_ai_evolution_optimizer(demand: dict, capacity: int, max_plates: int, ge
 # ALGORITHM 4: Smart Clustering & Dynamic Phase Chunking Engine (V6)
 # ================================================================
 def algo_smart_clustering_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
-    """V6 - High-Efficiency Multi-Phase Dynamic Chunking Engine for extreme variance"""
     if not demand: return []
     
     remaining = copy.deepcopy(demand)
@@ -768,9 +761,9 @@ def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 
 
 # ================================================================
-# MAIN UI
+# MAIN CONFIGURATION UI
 # ================================================================
-st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">⚙️ Production Configuration</div>', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="card-title">⚙️ Production Configuration</div>', unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1: n = st.number_input("🏷️ Number of Items", 1, 500, 1)
@@ -784,15 +777,15 @@ with col5:
 st.markdown('</div>', unsafe_allow_html=True)
 st.session_state['job_number'] = job_number
 
-st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Input Method</div>', unsafe_allow_html=True)
-input_mode = st.radio("Select Input Mode:", options=["✏️ Manual Input", "📂 Upload Excel File"], horizontal=True, index=1)
+st.markdown('<div class="card"><div class="card-title">📦 Input Method</div>', unsafe_allow_html=True)
+input_mode = st.radio("Select Input Mode:", options=["✏️ Manual Input", "📂 Upload Excel File"], horizontal=True, index=1, label_visibility="collapsed")
 st.markdown('</div>', unsafe_allow_html=True)
 
 tags, styles, colors, sizes, qty = [], [], [], [], []
 original_qty, demand = {}, {}
 
 if input_mode == "✏️ Manual Input":
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><div class="card-title">📦 Item Quantity Details (Manual)</div>', unsafe_allow_html=True)
     col1, col2, col3, col4, col5 = st.columns([0.5, 1.5, 1.5, 1.5, 2])
     col1.markdown("**SL**"); col2.markdown("**Style**"); col3.markdown("**Color**"); col4.markdown("**Size**"); col5.markdown("**Quantity**")
 
@@ -815,8 +808,8 @@ if input_mode == "✏️ Manual Input":
     st.markdown('</div>', unsafe_allow_html=True)
 
 else:
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📂 Excel/CSV File Upload</div>', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader("Upload Excel or CSV file (Must have columns: Style, Color, Size, QTY)", type=["xlsx", "xls", "csv"])
+    st.markdown('<div class="card"><div class="card-title">📂 Excel/CSV File Upload</div>', unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("Upload Excel or CSV file (Must have columns: Style, Color, Size, QTY)", type=["xlsx", "xls", "csv"], label_visibility="collapsed")
     
     if uploaded_file is not None:
         try:
@@ -883,7 +876,7 @@ st.session_state['original_qty'] = original_qty
 # PROCESSING ENGINE & AUTO-SELECTION
 # ================================================================
 if tags and sum(qty) > 0:
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📊 Optimization Control Center</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><div class="card-title">📊 Optimization Control Center</div>', unsafe_allow_html=True)
     
     all_results = {}
     with st.spinner("⚡ AI Engines running parallel optimization..."):
@@ -993,26 +986,26 @@ if tags and sum(qty) > 0:
 
 
     # ================================================================
-    # 📑 VIEW INDIVIDUAL ALGORITHM REPORT SECTION
+    # 📑 VIEW INDIVIDUAL ALGORITHM REPORT SECTION (PRESERVING DESIGN)
     # ================================================================
-    st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">📑 View Individual Algorithm Report</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><div class="card-title">📑 View Individual Algorithm Report</div>', unsafe_allow_html=True)
     
     report_options = list(st.session_state['all_results'].keys())
-    selected_report_algo = st.selectbox("🔍 Choose Algorithm for Detailed Report:", options=report_options, key="report_algo_select")
+    selected_report_algo = st.selectbox("🔍 Choose Algorithm for Detailed Report:", options=report_options, key="report_algo_select", label_visibility="collapsed")
 
     if selected_report_algo:
-        selected_plates = st.session_state['all_results'].get(selected_report_algo)
-        if selected_plates:
+        selected_plates_rep = st.session_state['all_results'].get(selected_report_algo)
+        if selected_plates_rep:
             st.markdown(f"### 📋 Detailed Breakdowns Matrix ({selected_report_algo})")
-            full_df = build_full_summary(selected_plates, st.session_state['demand'], st.session_state['original_qty'])
-            st.dataframe(full_df, use_container_width=True, height=400)
+            full_df = build_full_summary(selected_plates_rep, st.session_state['demand'], st.session_state['original_qty'])
+            st.dataframe(full_df, use_container_width=True, height=400, hide_index=True)
 
             st.markdown("### 🧾 Plate Configuration Details")
             plate_rows = []
-            total_sheets = 0
-            total_ups = 0
+            total_sheets_rep = 0
+            total_ups_rep = 0
             
-            for idx, p in enumerate(selected_plates, 1):
+            for idx, p in enumerate(selected_plates_rep, 1):
                 ups_sum = sum(p["layout"].values())
                 plate_rows.append({
                     "SL": idx,
@@ -1020,27 +1013,29 @@ if tags and sum(qty) > 0:
                     "Sheets Required": p.get("sheets", 0),
                     "Total UPS": ups_sum,
                 })
-                total_sheets += p.get("sheets", 0)
-                total_ups += ups_sum
+                total_sheets_rep += p.get("sheets", 0)
+                total_ups_rep += ups_sum
 
             plate_rows.append({
                 "SL": "📊",
                 "Plate ID": "TOTAL",
-                "Sheets Required": total_sheets,
-                "Total UPS": total_ups,
+                "Sheets Required": total_sheets_rep,
+                "Total UPS": total_ups_rep,
             })
 
             plate_df = pd.DataFrame(plate_rows)
-            st.dataframe(plate_df, use_container_width=True)
+            st.dataframe(plate_df, use_container_width=True, hide_index=True)
 
-            waste = calculate_waste_percent(selected_plates, st.session_state['demand'])
-            st.success(f"**Waste: {waste}%** | Plates: {len(selected_plates)} | Total Sheets: {total_sheets}")
+            waste_rep = calculate_waste_percent(selected_plates_rep, st.session_state['demand'])
+            st.success(f"**Waste: {waste_rep}%** | Plates: {len(selected_plates_rep)} | Total Sheets: {total_sheets_rep}")
         else:
-            st.error(f"❌ Report not found for {selected_algo}")
+            st.error(f"❌ Report not found for {selected_report_algo}")
 
         st.markdown("---")
         st.markdown("## 📊 Algorithm Comparison (Sorted by Waste %)")
         st.dataframe(comparison_df.style.background_gradient(cmap='viridis', subset=['Waste %']), use_container_width=True, hide_index=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ================================================================
