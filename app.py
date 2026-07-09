@@ -806,9 +806,9 @@ def algo_global_optimizer(demand: dict, capacity: int, max_plates: int) -> list:
 st.markdown('<div class="card"><div class="card-title" style="text-align: center; display: block; width: 100%;">⚙️ Production Configuration</div>', unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5 = st.columns(5)
-with col1: n = st.number_input("🏷️ Number of Items", 1, 500, 48)
-with col2: cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 60)
-with col3: maxp = st.number_input("🎨 Max Plates", 1, 50, 4)
+with col1: n = st.number_input("🏷️ Number of Items", 1, 500, 1)
+with col2: cap = st.number_input("📀 Plate Capacity (UPS)", 1, 200, 10)
+with col3: maxp = st.number_input("🎨 Max Plates", 1, 50, 3)
 with col4: addon = st.number_input("📈 Add-on (%)", 0.0, 50.0, 0.0, step=0.5)
 with col5:
     job_number = st.text_input("🔢 Job Number", value="", placeholder="e.g., JOB-001")
@@ -905,7 +905,7 @@ else:
 if not demand: st.stop()
 
 col1, col2, col3 = st.columns([1, 2, 1])
-generate_clicked = col2.button("🚀 Run Highly-Optimized Algorithms", use_container_width=True, type="primary")
+generate_clicked = col2.button("Run Algorithms", use_container_width=True, type="primary")
 
 if generate_clicked:
     with st.spinner("🔍 Executing Advanced Multi-Phase Computations..."):
